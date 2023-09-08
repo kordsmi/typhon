@@ -2,6 +2,14 @@ class JSExpression:
     pass
 
 
+class JSStatement:
+    pass
+
+
+class JSOperator:
+    pass
+
+
 class JSName(JSExpression):
     def __init__(self, id: str):
         self.id = id
@@ -89,7 +97,7 @@ class JSBinOp(JSExpression):
         return True
 
 
-class JSAssign:
+class JSAssign(JSStatement):
     def __init__(self, target, value):
         self.target = target
         self.value = value
@@ -107,6 +115,6 @@ class JSAssign:
         return True
 
 
-class JSAdd:
+class JSAdd(JSOperator):
     def __eq__(self, other):
         return isinstance(other, self.__class__)
