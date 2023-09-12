@@ -1,3 +1,6 @@
+from typing import Union
+
+
 class JSExpression:
     pass
 
@@ -83,22 +86,19 @@ class JSBinOp(JSExpression):
             return False
 
         if self.left != other.left:
-            print('left')
             return False
 
         if self.right != other.right:
-            print('right')
             return False
 
         if self.op != other.op:
-            print('op')
             return False
 
         return True
 
 
 class JSAssign(JSStatement):
-    def __init__(self, target, value):
+    def __init__(self, target: JSName, value: JSExpression):
         self.target = target
         self.value = value
 
@@ -107,6 +107,20 @@ class JSAssign(JSStatement):
             return False
 
         if self.target != other.target:
+            return False
+
+        if self.value != other.value:
+            return False
+
+        return True
+
+
+class JSCodeExpression(JSStatement):
+    def __init__(self, value: Union[JSStatement, JSExpression]):
+        self.value = value
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
             return False
 
         if self.value != other.value:

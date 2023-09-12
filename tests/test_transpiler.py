@@ -1,7 +1,11 @@
 import ast
 
+import pytest
+
 from typhon import js_ast
-from typhon.transpiler import transpile, transpile_bin_op, transpile_call, transpile_assign
+from typhon.exceptions import InvalidNode
+from typhon.transpiler import transpile, transpile_bin_op, transpile_call, transpile_assign, transpile_expression, \
+    Transpiler
 
 
 def test_transpiler():
@@ -11,6 +15,25 @@ def test_transpiler():
     result = transpile(py_str)
 
     assert result == js_str
+
+
+class TestTranspiler:
+    def test_transpile_multiple_expressions(self):
+        src = '''a = 1
+print('a + 2 = ', a + 2)'''
+        transpiler = Transpiler(src)
+        transpiler.parse()
+
+        transpiler.transpile_src()
+
+        expected = [
+            js_ast.JSAssign(target=js_ast.JSName(id='a'), value=js_ast.JSConstant(value=1)),
+            js_ast.JSCodeExpression(js_ast.JSCall(func='console.log', args=[
+                js_ast.JSConstant(value='a + 2 = '),
+                js_ast.JSBinOp(left=js_ast.JSName(id='a'), op=js_ast.JSAdd(), right=js_ast.JSConstant(value=2)),
+            ]))
+        ]
+        assert transpiler.js_tree == expected
 
 
 def test_transpile_set_variable__int():
@@ -131,3 +154,13 @@ def test_transpile_call__with_expression():
         ]
     )
     assert result == expected
+
+
+def test_transpile_expression__unknown_node():
+    class UnknownNode(ast.expr):
+        pass
+
+    with pytest.raises(InvalidNode) as e:
+        transpile_expression(UnknownNode())
+
+    assert isinstance(e.value.node, UnknownNode)

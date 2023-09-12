@@ -1,4 +1,5 @@
 from typhon import js_ast
+from typhon.exceptions import UnsupportedNode
 
 
 def generate_js_bin_op(node: js_ast.JSBinOp) -> str:
@@ -29,17 +30,35 @@ def generate_js_constant(node: js_ast.JSConstant):
     return str(node.value)
 
 
+NODE_GENERATOR_FUNCTIONS = {
+    js_ast.JSBinOp: generate_js_bin_op,
+    js_ast.JSCall: generate_js_call,
+    js_ast.JSName: generate_js_name,
+    js_ast.JSConstant: generate_js_constant,
+}
+
+
 def generate_js_expression(node: js_ast.JSExpression) -> str:
-    if isinstance(node, js_ast.JSBinOp):
-        return generate_js_bin_op(node)
-    elif isinstance(node, js_ast.JSCall):
-        return generate_js_call(node)
-    elif isinstance(node, js_ast.JSName):
-        return generate_js_name(node)
-    elif isinstance(node, js_ast.JSConstant):
-        return generate_js_constant(node)
+    generator_function = NODE_GENERATOR_FUNCTIONS.get(type(node), None)
+    if not generator_function:
+        raise UnsupportedNode(f'Node {type(node).__name__} not supported yet')
+
+    return generator_function(node)
 
 
-def generate_js(node) -> str:
-    if isinstance(node, js_ast.JSExpression):
-        return generate_js_expression(node)
+def generate_js_assign(node: js_ast.JSAssign) -> str:
+    return f'{generate_js_name(node.target)} = {generate_js_expression(node.value)}'
+
+
+def generate_js_code_expression(node: js_ast.JSCodeExpression) -> str:
+    return generate_js_expression(node.value)
+
+
+def generate_js_statement(node: js_ast.JSStatement) -> str:
+    js_node = None
+    if isinstance(node, js_ast.JSAssign):
+        js_node = generate_js_assign(node)
+    if isinstance(node, js_ast.JSCodeExpression):
+        js_node = generate_js_code_expression(node)
+
+    return js_node + ';'

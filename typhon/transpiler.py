@@ -1,13 +1,39 @@
 import ast
+from typing import Optional
 
 from typhon import js_ast
-from typhon.generator import generate_js
+from typhon.exceptions import InvalidNode
+from typhon.generator import generate_js_statement
+
+
+class Transpiler:
+    def __init__(self, src: str):
+        self.py_tree: Optional[ast.Module] = None
+        self.js_tree = None
+        self.src: str = src
+
+    def transpile(self):
+        self.parse()
+        self.transpile_src()
+        return self.generate_js()
+
+    def parse(self):
+        self.py_tree = ast.parse(self.src)
+
+    def transpile_src(self):
+        self.js_tree = [transpile_statement(expr) for expr in self.py_tree.body]
+
+    def generate_js(self):
+        result = []
+        for node in self.js_tree:
+            js_code = generate_js_statement(node)
+            result.append(js_code)
+        return '\n'.join(result)
 
 
 def transpile(src: str) -> str:
-    py_tree = ast.parse(src)
-    js_tree = transpile_call(py_tree.body[0].value)
-    return generate_js(js_tree) + ';'
+    transpiler = Transpiler(src)
+    return transpiler.transpile()
 
 
 def transpile_bin_op(node: ast.BinOp) -> js_ast.JSBinOp:
@@ -35,14 +61,27 @@ def transpile_call(node: ast.Call) -> js_ast.JSCall:
     return js_ast.JSCall(func_name, args=js_args, keywords=js_keywords)
 
 
+def transpile_constant(constant: ast.Constant) -> js_ast.JSConstant:
+    return js_ast.JSConstant(value=constant.value)
+
+
+def transpile_name(name: ast.Name) -> js_ast.JSName:
+    return js_ast.JSName(id=name.id)
+
+
+NODE_TRANSPILER_FUNCTIONS = {
+    ast.Name: transpile_name,
+    ast.Constant: transpile_constant,
+    ast.BinOp: transpile_bin_op,
+    ast.Call: transpile_call,
+}
+
+
 def transpile_expression(node: ast.expr) -> js_ast.JSExpression:
-    if isinstance(node, ast.Name):
-        js_node = transpile_name(node)
-    elif isinstance(node, ast.Constant):
-        js_node = transpile_constant(node)
-    elif isinstance(node, ast.BinOp):
-        js_node = transpile_bin_op(node)
-    return js_node
+    transpiler_function = NODE_TRANSPILER_FUNCTIONS.get(type(node), None)
+    if not transpiler_function:
+        raise InvalidNode(node=node)
+    return transpiler_function(node)
 
 
 def transpile_assign(node: ast.Assign) -> js_ast.JSAssign:
@@ -53,9 +92,17 @@ def transpile_assign(node: ast.Assign) -> js_ast.JSAssign:
     return js_ast.JSAssign(target=js_target, value=js_value)
 
 
-def transpile_constant(constant: ast.Constant) -> js_ast.JSConstant:
-    return js_ast.JSConstant(value=constant.value)
+def transpile_statement(node: ast.stmt) -> js_ast.JSStatement:
+    js_node = None
+    if isinstance(node, ast.Assign):
+        js_node = transpile_assign(node)
+    elif isinstance(node, ast.Expr):
+        js_node = transpile_code_expression(node)
+    return js_node
 
 
-def transpile_name(name: ast.Name) -> js_ast.JSName:
-    return js_ast.JSName(id=name.id)
+def transpile_code_expression(node: ast.Expr) -> js_ast.JSCodeExpression:
+    node_value = node.value
+    node_value_js = transpile_expression(node_value)
+
+    return js_ast.JSCodeExpression(value=node_value_js)

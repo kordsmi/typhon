@@ -1,27 +1,30 @@
 import pytest
 
 from typhon import js_ast
-from typhon.generator import generate_js, generate_js_name, generate_js_constant, generate_js_expression, \
-    generate_js_bin_op, generate_js_call
+from typhon.exceptions import UnsupportedNode
+from typhon.generator import generate_js_name, generate_js_constant, generate_js_expression, \
+    generate_js_bin_op, generate_js_call, generate_js_code_expression, generate_js_statement
 
 
-def test_js_generator():
-    js_node = js_ast.JSBinOp(left=js_ast.JSConstant(value=1), op=js_ast.JSAdd(), right=js_ast.JSConstant(value=2))
+def test_generate_js_code__expression():
+    js_node = js_ast.JSCodeExpression(
+        value=js_ast.JSBinOp(left=js_ast.JSConstant(value=1), op=js_ast.JSAdd(), right=js_ast.JSConstant(value=2))
+    )
     js_str = '1 + 2'
 
-    result = generate_js(js_node)
+    result = generate_js_code_expression(js_node)
 
     assert result == js_str
 
 
-def test_js_generator__call():
-    js_node = js_ast.JSCall(
-        func='console.log',
-        args=[js_ast.JSBinOp(left=js_ast.JSConstant(value=1), op=js_ast.JSAdd(), right=js_ast.JSConstant(value=2))]
+def test_generate_js_statement__assign():
+    js_node = js_ast.JSAssign(
+        target=js_ast.JSName(id='v'),
+        value=js_ast.JSConstant(value=2)
     )
-    js_str = 'console.log(1 + 2)'
+    js_str = 'v = 2;'
 
-    result = generate_js(js_node)
+    result = generate_js_statement(js_node)
 
     assert result == js_str
 
@@ -61,6 +64,28 @@ def test_generate_js_expression__constant(value, result):
     js_node = js_ast.JSConstant(value=value)
 
     assert generate_js_expression(js_node) == result
+
+
+def test_generate_js_expression__call():
+    js_node = js_ast.JSCall(
+        func='console.log',
+        args=[js_ast.JSBinOp(left=js_ast.JSConstant(value=1), op=js_ast.JSAdd(), right=js_ast.JSConstant(value=2))]
+    )
+    js_str = 'console.log(1 + 2)'
+
+    result = generate_js_expression(js_node)
+
+    assert result == js_str
+
+
+def test_generate_js_expression__unsupported_node():
+    class NewNode(js_ast.JSExpression):
+        pass
+
+    js_node = NewNode()
+
+    with pytest.raises(UnsupportedNode):
+        generate_js_expression(js_node)
 
 
 def test_generate_js_bin_op():
