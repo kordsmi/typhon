@@ -1,134 +1,161 @@
 from typing import Union
 
 
-class JSExpression:
+class JSNode:
+    _fields = ()
+
+    def __init__(self, **kwargs):
+        for field_name in kwargs:
+            setattr(self, field_name, kwargs.get(field_name))
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+
+        for field_name in self._fields:
+            if getattr(self, field_name) != getattr(other, field_name):
+                print(f'Compare error on {self.__class__.__name__}.{field_name}: {getattr(self, field_name)} != {getattr(other, field_name)}')
+                return False
+
+        return True
+
+    def __repr__(self):
+        args = []
+        for field_name in self._fields:
+            value = getattr(self, field_name)
+            if type(value) == str:
+                value = f"'{value}'"
+            arg_expr = f'{field_name}={value}'
+            args.append(arg_expr)
+        args_str = ', '.join(args)
+        return f'{self.__class__.__module__}.{self.__class__.__name__}({args_str})'
+
+
+class JSExpression(JSNode):
     pass
 
 
-class JSStatement:
+class JSStatement(JSNode):
     pass
 
 
-class JSOperator:
+class JSOperator(JSNode):
     pass
 
 
 class JSName(JSExpression):
+    _fields = (
+        'id',
+    )
+
     def __init__(self, id: str):
-        self.id = id
-
-    def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return False
-
-        return self.id == other.id
+        super().__init__(id=id)
 
 
 class JSConstant(JSExpression):
+    _fields = (
+        'value',
+    )
+
     def __init__(self, value: str | int):
-        self.value = value
-
-    def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return False
-
-        return self.value == other.value
+        super().__init__(value=value)
 
 
-class JSKeyWord:
+class JSKeyWord(JSNode):
+    _fields = (
+        'arg',
+        'value',
+    )
+
     def __init__(self, arg: str, value: JSExpression):
-        self.arg = arg
-        self.value = value
-
-    def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return False
-
-        if self.arg != other.arg:
-            return False
-
-        if self.value != other.value:
-            return False
-
-        return True
+        super().__init__(arg=arg, value=value)
 
 
 class JSCall(JSExpression):
-    def __init__(self, func: str, args: [] = None, keywords: [JSKeyWord] = None):
-        self.func = func
-        self.args = args or []
-        self.keywords = keywords or []
+    _fields = (
+        'func',
+        'args',
+        'keywords',
+    )
 
-    def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return False
-
-        if self.func != other.func:
-            return False
-
-        if self.args != other.args:
-            return False
-
-        if self.keywords != other.keywords:
-            return False
-
-        return True
+    def __init__(self, func: str, args: [JSExpression] = None, keywords: [JSKeyWord] = None):
+        super().__init__(func=func, args=args, keywords=keywords or [])
 
 
 class JSBinOp(JSExpression):
+    _fields = (
+        'left',
+        'op',
+        'right',
+    )
+
     def __init__(self, left, op, right):
-        self.left = left
-        self.op = op
-        self.right = right
-
-    def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return False
-
-        if self.left != other.left:
-            return False
-
-        if self.right != other.right:
-            return False
-
-        if self.op != other.op:
-            return False
-
-        return True
+        super().__init__(left=left, op=op, right=right)
 
 
 class JSAssign(JSStatement):
+    _fields = (
+        'target',
+        'value',
+    )
+
     def __init__(self, target: JSName, value: JSExpression):
-        self.target = target
-        self.value = value
-
-    def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return False
-
-        if self.target != other.target:
-            return False
-
-        if self.value != other.value:
-            return False
-
-        return True
+        super().__init__(target=target, value=value)
 
 
 class JSCodeExpression(JSStatement):
+    _fields = (
+        'value',
+    )
+
     def __init__(self, value: Union[JSStatement, JSExpression]):
-        self.value = value
-
-    def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return False
-
-        if self.value != other.value:
-            return False
-
-        return True
+        super().__init__(value=value)
 
 
 class JSAdd(JSOperator):
-    def __eq__(self, other):
-        return isinstance(other, self.__class__)
+    pass
+
+
+class JSArg(JSNode):
+    _fields = (
+        'arg',
+    )
+
+    def __init__(self, arg: str):
+        super().__init__(arg=arg)
+
+
+class JSArguments(JSNode):
+    _fields = (
+        'args',
+        'defaults',
+        'vararg',
+        'kwonlyargs',
+        'kw_defaults',
+        'kwarg',
+    )
+
+    def __init__(self, args: [JSArg] = None, defaults: [JSExpression] = None, vararg: JSArg = None,
+                 kwonlyargs: [JSArg] = None, kw_defaults: [JSExpression] = None, kwarg: JSArg = None):
+        super().__init__(args=args, defaults=defaults, vararg=vararg,
+                         kwonlyargs=kwonlyargs, kw_defaults=kw_defaults, kwarg=kwarg)
+
+
+class JSFunctionDef(JSStatement):
+    _fields = (
+        'name',
+        'args',
+        'body',
+    )
+
+    def __init__(self, name: str, args: JSArguments, body: [JSStatement]):
+        super().__init__(name=name, args=args, body=body)
+
+
+class JSReturn(JSStatement):
+    _fields = (
+        'value',
+    )
+
+    def __init__(self, value: JSExpression):
+        super().__init__(value=value)

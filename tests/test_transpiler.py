@@ -5,7 +5,8 @@ import pytest
 from typhon import js_ast
 from typhon.exceptions import InvalidNode
 from typhon.transpiler import transpile, transpile_bin_op, transpile_call, transpile_assign, transpile_expression, \
-    Transpiler
+    Transpiler, transpile_arg, transpile_arguments, transpile_statement, transpile_function_def, transpile_return, \
+    transpile_arg_list, transpile_expression_list
 
 
 def test_transpiler():
@@ -35,25 +36,34 @@ print('a + 2 = ', a + 2)'''
         ]
         assert transpiler.js_tree == expected
 
+    def test_transpile_function(self):
+        src = '''def foo(a):
+    return a'''
+        transpiler = Transpiler(src)
+        transpiler.parse()
+
+        transpiler.transpile_src()
+
+        expected = [transpile_function_def(transpiler.py_tree.body[0])]
+        assert transpiler.js_tree == expected
+        assert transpiler.js_tree[0].body[0] == transpile_return(transpiler.py_tree.body[0].body[0])
+
 
 def test_transpile_set_variable__int():
-    assign_node = ast.Assign(
-        targets=[ast.Name(id='a', ctx=ast.Store())],
-        value=ast.Constant(value='sample')
-    )
+    assign_node = _create_assign_statement('a', ast.Constant(value='sample'))
 
     result = transpile_assign(assign_node)
 
-    assert isinstance(result, js_ast.JSAssign)
-    assert isinstance(result.target, js_ast.JSName)
-    assert result.target.id == 'a'
-    assert isinstance(result.value, js_ast.JSConstant)
-    assert result.value.value == 'sample'
+    expected = js_ast.JSAssign(
+        target=js_ast.JSName('a'),
+        value=js_ast.JSConstant('sample')
+    )
+    assert result == expected
 
 
 def test_transpile_set_variable__expression():
-    assign_node = ast.Assign(
-        targets=[ast.Name(id='b', ctx=ast.Store())],
+    assign_node = _create_assign_statement(
+        name='b',
         value=ast.BinOp(
             left=ast.Name(id='a', ctx=ast.Load()),
             op=ast.Add(),
@@ -63,14 +73,11 @@ def test_transpile_set_variable__expression():
 
     result = transpile_assign(assign_node)
 
-    assert result.target.id == 'b'
-    value = result.value
-    assert isinstance(value, js_ast.JSBinOp)
-    assert isinstance(value.left, js_ast.JSName)
-    assert value.left.id == 'a'
-    assert isinstance(value.op, js_ast.JSAdd)
-    assert isinstance(value.right, js_ast.JSConstant)
-    assert value.right.value == 3
+    expected = js_ast.JSAssign(
+        target=js_ast.JSName('b'),
+        value=transpile_bin_op(assign_node.value)
+    )
+    assert result == expected
 
 
 def test_transpile_bin_op():
@@ -164,3 +171,94 @@ def test_transpile_expression__unknown_node():
         transpile_expression(UnknownNode())
 
     assert isinstance(e.value.node, UnknownNode)
+
+
+def test_transpile_arg():
+    node = ast.arg(arg='a')
+
+    js_node = transpile_arg(node)
+
+    expected = js_ast.JSArg(arg='a')
+    assert js_node == expected
+
+
+def test_transpile_arguments():
+    node = _create_arguments_node(['a', 'b'])
+
+    js_node = transpile_arguments(node)
+
+    expected = js_ast.JSArguments(args=transpile_arg_list(node.args))
+    assert js_node == expected
+
+
+def test_transpile_arguments__kwargs_and_defaults():
+    node = _create_arguments_node(['a', 'b'], [ast.Constant(value=1)], 'arg',
+                                  ['c', 'd'], [None, ast.Constant(value=1)], 'kwargs')
+
+    js_node = transpile_arguments(node)
+
+    expected = js_ast.JSArguments(
+        args=transpile_arg_list(node.args),
+        defaults=transpile_expression_list(node.defaults),
+        vararg=transpile_arg(node.vararg),
+        kwonlyargs=transpile_arg_list(node.kwonlyargs),
+        kw_defaults=transpile_expression_list(node.kw_defaults),
+        kwarg=transpile_arg(node.kwarg),
+    )
+    assert js_node == expected
+
+
+def _create_arguments_node(
+        args: [str], defaults: [ast.expr] = None, vararg: str = None,
+        kwonlyargs: [str] = None, kw_defaults: [ast.expr] = None, kwarg: str = None
+) -> ast.arguments:
+    defaults = defaults or []
+    kwonlyargs = kwonlyargs or []
+    kw_defaults = kw_defaults or []
+
+    node_extra_params = {}
+    arg_nodes = [ast.arg(arg=arg_name) for arg_name in args]
+    kwonlyargs_nodes = [ast.arg(arg=arg_name) for arg_name in kwonlyargs]
+    if vararg:
+        node_extra_params['vararg'] = ast.arg(arg=vararg)
+    if kwarg:
+        node_extra_params['kwarg'] = ast.arg(arg=kwarg)
+    return ast.arguments(
+        posonlyargs=[],
+        args=arg_nodes,
+        kwonlyargs=kwonlyargs_nodes,
+        kw_defaults=kw_defaults,
+        defaults=defaults,
+        **node_extra_params,
+    )
+
+
+def _create_assign_statement(name: str, value: ast.expr) -> ast.Assign:
+    return ast.Assign(
+        targets=[ast.Name(id=name, ctx=ast.Store())],
+        value=value,
+    )
+
+
+def test_transpile_function_def():
+    arguments_node = _create_arguments_node(['a'])
+    assign_statement = _create_assign_statement('b', ast.Constant(value='sample'))
+    node = ast.FunctionDef(name='foo', args=arguments_node, body=[assign_statement])
+
+    js_node = transpile_function_def(node)
+
+    expected = js_ast.JSFunctionDef(
+        name='foo',
+        args=transpile_arguments(arguments_node),
+        body=[transpile_statement(assign_statement)]
+    )
+    assert js_node == expected
+
+
+def test_transpile_return():
+    node = ast.Return(value=ast.Constant(value=1))
+
+    js_node = transpile_return(node)
+
+    expected = js_ast.JSReturn(value=js_ast.JSConstant(value=1))
+    assert js_node == expected

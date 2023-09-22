@@ -1,9 +1,9 @@
 import ast
-from typing import Optional
+from typing import Optional, List
 
 from typhon import js_ast
 from typhon.exceptions import InvalidNode
-from typhon.generator import generate_js_statement
+from typhon.generator import generate_js_body
 
 
 class Transpiler:
@@ -21,14 +21,10 @@ class Transpiler:
         self.py_tree = ast.parse(self.src)
 
     def transpile_src(self):
-        self.js_tree = [transpile_statement(expr) for expr in self.py_tree.body]
+        self.js_tree = _transpile_body(self.py_tree.body)
 
     def generate_js(self):
-        result = []
-        for node in self.js_tree:
-            js_code = generate_js_statement(node)
-            result.append(js_code)
-        return '\n'.join(result)
+        return generate_js_body(self.js_tree)
 
 
 def transpile(src: str) -> str:
@@ -53,7 +49,7 @@ def transpile_call(node: ast.Call) -> js_ast.JSCall:
         func_name = 'console.log'
 
     args = getattr(node, 'args', [])
-    js_args = [transpile_expression(arg) for arg in args]
+    js_args = transpile_expression_list(args)
 
     keywords = getattr(node, 'keywords', [])
     js_keywords = [transpile_keyword(keyword) for keyword in keywords]
@@ -74,6 +70,7 @@ NODE_TRANSPILER_FUNCTIONS = {
     ast.Constant: transpile_constant,
     ast.BinOp: transpile_bin_op,
     ast.Call: transpile_call,
+    type(None): lambda node: node,
 }
 
 
@@ -92,17 +89,59 @@ def transpile_assign(node: ast.Assign) -> js_ast.JSAssign:
     return js_ast.JSAssign(target=js_target, value=js_value)
 
 
-def transpile_statement(node: ast.stmt) -> js_ast.JSStatement:
-    js_node = None
-    if isinstance(node, ast.Assign):
-        js_node = transpile_assign(node)
-    elif isinstance(node, ast.Expr):
-        js_node = transpile_code_expression(node)
-    return js_node
-
-
 def transpile_code_expression(node: ast.Expr) -> js_ast.JSCodeExpression:
     node_value = node.value
     node_value_js = transpile_expression(node_value)
 
     return js_ast.JSCodeExpression(value=node_value_js)
+
+
+def transpile_function_def(node: ast.FunctionDef) -> js_ast.JSFunctionDef:
+    body_node = _transpile_body(node.body)
+    return js_ast.JSFunctionDef(name=node.name, args=transpile_arguments(node.args), body=body_node)
+
+
+def transpile_return(node: ast.Return) -> js_ast.JSReturn:
+    return js_ast.JSReturn(value=transpile_expression(node.value))
+
+
+STATEMENT_TRANSPILER_FUNCTIONS = {
+    ast.Assign: transpile_assign,
+    ast.Expr: transpile_code_expression,
+    ast.FunctionDef: transpile_function_def,
+    ast.Return: transpile_return,
+}
+
+
+def transpile_statement(node: ast.stmt) -> js_ast.JSStatement:
+    statement_transpiler = STATEMENT_TRANSPILER_FUNCTIONS.get(type(node))
+    if not statement_transpiler:
+        raise InvalidNode(node=node)
+    return statement_transpiler(node)
+
+
+def transpile_arg(node: ast.arg) -> js_ast.JSArg:
+    return js_ast.JSArg(arg=node.arg)
+
+
+def transpile_arg_list(nodes: [ast.arg]) -> Optional[List[js_ast.JSArg]]:
+    return [transpile_arg(arg) for arg in nodes] if nodes else None
+
+
+def transpile_expression_list(expressions: [ast.expr]) -> Optional[List[js_ast.JSExpression]]:
+    return [transpile_expression(expr) for expr in expressions] if expressions else None
+
+
+def transpile_arguments(node: ast.arguments) -> js_ast.JSArguments:
+    js_args = transpile_arg_list(node.args)
+    defaults = transpile_expression_list(node.defaults)
+    vararg = transpile_arg(node.vararg) if node.vararg else None
+    kwonlyargs = transpile_arg_list(node.kwonlyargs)
+    kw_defaults = transpile_expression_list(node.kw_defaults)
+    kwarg = transpile_arg(node.kwarg) if node.kwarg else None
+    return js_ast.JSArguments(args=js_args, defaults=defaults, vararg=vararg,
+                              kwonlyargs=kwonlyargs, kw_defaults=kw_defaults, kwarg=kwarg)
+
+
+def _transpile_body(node: [ast.stmt]) -> [js_ast.JSStatement]:
+    return [transpile_statement(expr) for expr in node]
