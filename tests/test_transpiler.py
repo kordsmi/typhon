@@ -6,7 +6,7 @@ from typhon import js_ast
 from typhon.exceptions import InvalidNode
 from typhon.transpiler import transpile, transpile_bin_op, transpile_call, transpile_assign, transpile_expression, \
     Transpiler, transpile_arg, transpile_arguments, transpile_statement, transpile_function_def, transpile_return, \
-    transpile_arg_list, transpile_expression_list
+    transpile_arg_list, transpile_expression_list, transpile_body, transpile_constant, transpile_eq
 
 
 def test_transpiler():
@@ -173,6 +173,54 @@ def test_transpile_expression__unknown_node():
     assert isinstance(e.value.node, UnknownNode)
 
 
+def test_transpile_expression__list():
+    node = ast.List(elts=[ast.Constant(value=1), ast.Constant(value=2)])
+
+    js_node = transpile_expression(node)
+
+    expected = js_ast.JSList(elts=[js_ast.JSConstant(1), js_ast.JSConstant(2)])
+    assert js_node == expected
+
+
+def test_transpile_expression__tuple():
+    node = ast.Tuple(elts=[ast.Constant(value=1), ast.Constant(value=2)])
+
+    js_node = transpile_expression(node)
+
+    expected = js_ast.JSList(elts=[js_ast.JSConstant(1), js_ast.JSConstant(2)])
+    assert js_node == expected
+
+
+def test_transpile_expression__set():
+    node = ast.Set(elts=[ast.Constant(value=1), ast.Constant(value=2)])
+
+    js_node = transpile_expression(node)
+
+    expected = js_ast.JSList(elts=[js_ast.JSConstant(1), js_ast.JSConstant(2)])
+    assert js_node == expected
+
+
+def test_transpile_expression__dict():
+    node = ast.Dict(
+        keys=[ast.Constant(value='a'), ast.Constant(value='b')],
+        values=[ast.Constant(value=1), ast.Constant(value=2)]
+    )
+
+    js_node = transpile_expression(node)
+
+    expected = js_ast.JSDict(
+        keys=[js_ast.JSConstant('a'), js_ast.JSConstant('b')],
+        values=[js_ast.JSConstant(1), js_ast.JSConstant(2)]
+    )
+    assert js_node == expected
+
+
+def test_transpile_expression__compare():
+    node = ast.Compare(left=ast.Name(id='a'), ops=[ast.Eq()], comparators=[ast.Constant(value=1)])
+    js_node = transpile_expression(node)
+    assert js_node == js_ast.JSCompare(left=js_ast.JSName('a'), op=js_ast.JSEq(), right=js_ast.JSConstant(1))
+
+
 def test_transpile_arg():
     node = ast.arg(arg='a')
 
@@ -262,3 +310,114 @@ def test_transpile_return():
 
     expected = js_ast.JSReturn(value=js_ast.JSConstant(value=1))
     assert js_node == expected
+
+
+def test_transpile_body__with_pass():
+    body = [ast.Pass()]
+
+    js_body = transpile_body(body)
+
+    assert js_body == []
+
+
+def test_transpile_statement__while():
+    node = ast.While(test=ast.Constant(value=True), body=[ast.Pass()])
+
+    js_node = transpile_statement(node)
+
+    expected = js_ast.JSWhile(test=js_ast.JSConstant(value=True), body=[])
+    assert js_node == expected
+
+
+def test_transpile_statement__while_else():
+    node = ast.While(
+        test=ast.Constant(value=True),
+        body=[ast.Pass()],
+        orelse=[ast.Expr(ast.Name(id='a', ctx=ast.Load()))],
+    )
+
+    js_node = transpile_statement(node)
+
+    expected = js_ast.JSWhile(
+        test=js_ast.JSConstant(value=True),
+        body=[],
+        orelse=[js_ast.JSCodeExpression(js_ast.JSName('a'))],
+    )
+    assert js_node == expected
+
+
+def test_transpile_statement__if():
+    node = ast.If(test=ast.Constant(value=True), body=[ast.Pass()], orelse=[ast.Pass()])
+
+    js_node = transpile_statement(node)
+
+    expected = js_ast.JSIf(test=js_ast.JSConstant(value=True), body=[], orelse=[])
+    assert js_node == expected
+
+
+def test_transpile_statement__raise():
+    node = ast.Raise(exc=ast.Name(id='Exception', ctx=ast.Load()))
+
+    js_node = transpile_statement(node)
+
+    expected = js_ast.JSThrow(exc=js_ast.JSName('Exception'))
+    assert js_node == expected
+
+
+def test_transpile_statement__try():
+    node = ast.Try(
+        body=[ast.Expr(value=ast.Name(id='a', ctx=ast.Load()))],
+        handlers=[
+            ast.ExceptHandler(
+                type=ast.Name(id='Exception', ctx=ast.Load()),
+                body=[ast.Expr(value=ast.Name(id='b', ctx=ast.Load()))]
+            ),
+            ast.ExceptHandler(
+                type=ast.Name(id='AttributeError', ctx=ast.Load()),
+                body=[ast.Expr(value=ast.Name(id='c', ctx=ast.Load()))]
+            )
+        ],
+        orelse=[ast.Expr(value=ast.Name(id='d', ctx=ast.Load()))],
+        finalbody=[ast.Expr(value=ast.Name(id='e', ctx=ast.Load()))]
+    )
+
+    js_node = transpile_statement(node)
+
+    expected = js_ast.JSTry(
+        body=[js_ast.JSCodeExpression(js_ast.JSName('a'))],
+        catch=[js_ast.JSIf(
+            test=js_ast.JSCompare(js_ast.JSName('e.name'), js_ast.JSEq(), js_ast.JSName('Exception')),
+            body=[js_ast.JSCodeExpression(js_ast.JSName('b'))],
+            orelse=[js_ast.JSIf(
+                test=js_ast.JSCompare(js_ast.JSName('e.name'), js_ast.JSEq(), js_ast.JSName('AttributeError')),
+                body=[js_ast.JSCodeExpression(js_ast.JSName('c'))],
+                orelse=[js_ast.JSCodeExpression(js_ast.JSName('d'))]
+            )]
+        )],
+        finalbody=[js_ast.JSCodeExpression(js_ast.JSName('e'))],
+    )
+    assert js_node == expected
+
+
+def test_transpile_statement__continue():
+    node = ast.Continue()
+    js_node = transpile_statement(node)
+    assert js_node == js_ast.JSContinue()
+
+
+def test_transpile_statement__break():
+    node = ast.Break()
+    js_node = transpile_statement(node)
+    assert js_node == js_ast.JSBreak()
+
+
+def test_transpile_constant__true():
+    node = ast.Constant(value=True)
+    js_node = transpile_constant(node)
+    assert js_node == js_ast.JSConstant(value=True)
+
+
+def test_transpile_eq():
+    node = ast.Eq()
+    js_node = transpile_eq(node)
+    assert js_node == js_ast.JSEq()

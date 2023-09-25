@@ -21,7 +21,7 @@ class Transpiler:
         self.py_tree = ast.parse(self.src)
 
     def transpile_src(self):
-        self.js_tree = _transpile_body(self.py_tree.body)
+        self.js_tree = transpile_body(self.py_tree.body)
 
     def generate_js(self):
         return generate_js_body(self.js_tree)
@@ -65,17 +65,46 @@ def transpile_name(name: ast.Name) -> js_ast.JSName:
     return js_ast.JSName(id=name.id)
 
 
-NODE_TRANSPILER_FUNCTIONS = {
+def transpile_list(node: ast.List) -> js_ast.JSList:
+    return js_ast.JSList(elts=transpile_expression_list(node.elts))
+
+
+def transpile_tuple(node: ast.Tuple) -> js_ast.JSList:
+    return js_ast.JSList(elts=transpile_expression_list(node.elts))
+
+
+def transpile_set(node: ast.Set) -> js_ast.JSList:
+    return js_ast.JSList(elts=transpile_expression_list(node.elts))
+
+
+def transpile_dict(node: ast.Dict) -> js_ast.JSDict:
+    return js_ast.JSDict(keys=transpile_expression_list(node.keys), values=transpile_expression_list(node.values))
+
+
+def transpile_compare(node: ast.Compare) -> js_ast.JSCompare:
+    return js_ast.JSCompare(
+        left=transpile_expression(node.left),
+        op=transpile_eq(node.ops[0]),
+        right=transpile_expression(node.comparators[0])
+    )
+
+
+EXPRESSION_TRANSPILER_FUNCTIONS = {
     ast.Name: transpile_name,
     ast.Constant: transpile_constant,
     ast.BinOp: transpile_bin_op,
     ast.Call: transpile_call,
     type(None): lambda node: node,
+    ast.List: transpile_list,
+    ast.Tuple: transpile_tuple,
+    ast.Set: transpile_set,
+    ast.Dict: transpile_dict,
+    ast.Compare: transpile_compare,
 }
 
 
 def transpile_expression(node: ast.expr) -> js_ast.JSExpression:
-    transpiler_function = NODE_TRANSPILER_FUNCTIONS.get(type(node), None)
+    transpiler_function = EXPRESSION_TRANSPILER_FUNCTIONS.get(type(node), None)
     if not transpiler_function:
         raise InvalidNode(node=node)
     return transpiler_function(node)
@@ -97,7 +126,7 @@ def transpile_code_expression(node: ast.Expr) -> js_ast.JSCodeExpression:
 
 
 def transpile_function_def(node: ast.FunctionDef) -> js_ast.JSFunctionDef:
-    body_node = _transpile_body(node.body)
+    body_node = transpile_body(node.body)
     return js_ast.JSFunctionDef(name=node.name, args=transpile_arguments(node.args), body=body_node)
 
 
@@ -105,11 +134,62 @@ def transpile_return(node: ast.Return) -> js_ast.JSReturn:
     return js_ast.JSReturn(value=transpile_expression(node.value))
 
 
+def transpile_while(node: ast.While) -> js_ast.JSWhile:
+    extended_args = {}
+    if hasattr(node, 'orelse'):
+        extended_args['orelse'] = transpile_body(node.orelse)
+
+    return js_ast.JSWhile(test=transpile_expression(node.test), body=transpile_body(node.body), **extended_args)
+
+
+def tranpile_if(node: ast.If) -> js_ast.JSIf:
+    return js_ast.JSIf(
+        test=transpile_expression(node.test),
+        body=transpile_body(node.body),
+        orelse=transpile_body(node.orelse),
+    )
+
+
+def transpile_raise(node: ast.Raise) -> js_ast.JSThrow:
+    return js_ast.JSThrow(exc=transpile_expression(node.exc))
+
+
+def transpile_try(node: ast.Try) -> js_ast.JSTry:
+    prev_if = transpile_body(node.orelse)
+    for exception_handler in reversed(node.handlers):
+        if_statement = js_ast.JSIf(
+            test=js_ast.JSCompare(js_ast.JSName('e.name'), js_ast.JSEq(), js_ast.JSName(exception_handler.type.id)),
+            body=transpile_body(exception_handler.body),
+            orelse=prev_if
+        )
+        prev_if = [if_statement]
+
+    return js_ast.JSTry(
+        body=transpile_body(node.body),
+        catch=prev_if,
+        finalbody=transpile_body(node.finalbody),
+    )
+
+
+def transpile_continue(node: ast.Continue) -> js_ast.JSContinue:
+    return js_ast.JSContinue()
+
+
+def transpile_break(node: ast.Break) -> js_ast.JSBreak:
+    return js_ast.JSBreak()
+
+
 STATEMENT_TRANSPILER_FUNCTIONS = {
     ast.Assign: transpile_assign,
     ast.Expr: transpile_code_expression,
     ast.FunctionDef: transpile_function_def,
     ast.Return: transpile_return,
+    ast.While: transpile_while,
+    ast.If: tranpile_if,
+    ast.Raise: transpile_raise,
+    ast.Try: transpile_try,
+    ast.Continue: transpile_continue,
+    ast.Break: transpile_break,
 }
 
 
@@ -143,5 +223,13 @@ def transpile_arguments(node: ast.arguments) -> js_ast.JSArguments:
                               kwonlyargs=kwonlyargs, kw_defaults=kw_defaults, kwarg=kwarg)
 
 
-def _transpile_body(node: [ast.stmt]) -> [js_ast.JSStatement]:
-    return [transpile_statement(expr) for expr in node]
+def transpile_body(node: [ast.stmt]) -> [js_ast.JSStatement]:
+    return [
+        transpile_statement(expr)
+        for expr in node
+        if not isinstance(expr, ast.Pass)
+    ]
+
+
+def transpile_eq(node: ast.Eq) -> js_ast.JSEq:
+    return js_ast.JSEq()

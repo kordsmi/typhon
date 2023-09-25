@@ -16,7 +16,7 @@ def generate_js_keyword(node: js_ast.JSKeyWord) -> str:
 
 
 def generate_js_call(node: js_ast.JSCall) -> str:
-    args_str = [generate_js_expression(arg) for arg in node.args]
+    args_str = generate_expression_list(node.args)
     args_str += [generate_js_keyword(keyword) for keyword in node.keywords]
 
     return f'{node.func}({", ".join(args_str)})'
@@ -31,19 +31,46 @@ def generate_js_constant(node: js_ast.JSConstant):
         return f"'{node.value}'"
     elif node.value is None:
         return 'null'
+    elif node.value is True:
+        return 'true'
     return str(node.value)
 
 
-NODE_GENERATOR_FUNCTIONS = {
+def generate_js_list(node: js_ast.JSList) -> str:
+    elements = ', '.join(generate_expression_list(node.elts))
+    return f'[{elements}]'
+
+
+def generate_expression_list(expr_list: [js_ast.JSExpression]) -> [str]:
+    return [generate_js_expression(element) for element in expr_list]
+
+
+def generate_js_dict(node: js_ast.JSDict) -> str:
+    named_args_list = [
+        f'{generate_js_expression(key)}: {generate_js_expression(value)}'
+        for key, value in zip(node.keys, node.values)
+    ]
+    named_args_str = ', '.join(named_args_list)
+    return f'{{{named_args_str}}}'
+
+
+def generate_js_compare(node: js_ast.JSCompare) -> str:
+    return f'{generate_js_expression(node.left)} {generate_js_eq(node.op)} {generate_js_expression(node.right)}'
+
+
+EXPRESSION_GENERATOR_FUNCTIONS = {
     js_ast.JSBinOp: generate_js_bin_op,
     js_ast.JSCall: generate_js_call,
     js_ast.JSName: generate_js_name,
     js_ast.JSConstant: generate_js_constant,
+    js_ast.JSList: generate_js_list,
+    js_ast.JSDict: generate_js_dict,
+    js_ast.JSCompare: generate_js_compare,
 }
 
 
 def generate_js_expression(node: js_ast.JSExpression) -> str:
-    generator_function = NODE_GENERATOR_FUNCTIONS.get(type(node), None)
+    generator_function = EXPRESSION_GENERATOR_FUNCTIONS.get(type(node), None)
     if not generator_function:
         raise UnsupportedNode(f'Node {type(node).__name__} not supported yet')
 
@@ -63,8 +90,60 @@ def generate_js_return(node: js_ast.JSReturn) -> str:
 
 
 def generate_js_function_def(node: js_ast.JSFunctionDef) -> str:
-    code_block = '{\n' + generate_js_body(node.body, 1) + '\n}'
+    code_block = generate_code_block(node.body)
     return f'function {node.name}({generate_js_arguments(node.args)}) {code_block}'
+
+
+def generate_js_while(node: js_ast.JSWhile) -> str:
+    test_str = generate_js_expression(node.test)
+    while_body = generate_code_block(node.body)
+    else_body = ''
+    if node.orelse:
+        else_body = ' else ' + generate_code_block(node.orelse)
+    return f'while {test_str} {while_body}{else_body}'
+
+
+code_block_indent = 0
+
+
+def generate_code_block(body: [js_ast.JSStatement]) -> str:
+    global code_block_indent
+
+    code_block_indent += 1
+    try:
+        js_body_str = generate_js_body(body)
+    finally:
+        code_block_indent -= 1
+    if js_body_str:
+        js_body_str += '\n'
+    return '{\n' + js_body_str + get_indent_str() + '}'
+
+
+def generate_js_if(node: js_ast.JSIf) -> str:
+    if_str = f'if ({generate_js_expression(node.test)}) {generate_code_block(node.body)}'
+    else_str = f' else {generate_code_block(node.orelse)}' if node.orelse else ''
+    return if_str + else_str
+
+
+def generate_js_throw(node: js_ast.JSThrow) -> str:
+    return f'throw {generate_js_expression(node.exc)};'
+
+
+def generate_js_try(node: js_ast.JSTry) -> str:
+    try_str = f'try {generate_code_block(node.body)}'
+    catch_str = f' catch (e) {generate_code_block(node.catch)}'
+    finally_str = ''
+    if node.finalbody:
+        finally_str = f' finally {generate_code_block(node.finalbody)}'
+    return try_str + catch_str + finally_str
+
+
+def generate_js_continue(node: js_ast.JSContinue) -> str:
+    return 'continue;'
+
+
+def generate_js_break(node: js_ast.JSBreak) -> str:
+    return 'break;'
 
 
 STATEMENT_GENERATOR_FUNCTIONS = {
@@ -72,7 +151,17 @@ STATEMENT_GENERATOR_FUNCTIONS = {
     js_ast.JSCodeExpression: generate_js_code_expression,
     js_ast.JSReturn: generate_js_return,
     js_ast.JSFunctionDef: generate_js_function_def,
+    js_ast.JSWhile: generate_js_while,
+    js_ast.JSIf: generate_js_if,
+    js_ast.JSThrow: generate_js_throw,
+    js_ast.JSTry: generate_js_try,
+    js_ast.JSContinue: generate_js_continue,
+    js_ast.JSBreak: generate_js_break,
 }
+
+
+def get_indent_str() -> str:
+    return code_block_indent * 4 * ' '
 
 
 def generate_js_statement(node: js_ast.JSStatement) -> str:
@@ -80,7 +169,7 @@ def generate_js_statement(node: js_ast.JSStatement) -> str:
     if not generator_function:
         raise UnsupportedNode(f'Node {type(node).__name__} not supported yet')
 
-    return generator_function(node)
+    return get_indent_str() + generator_function(node)
 
 
 def generate_js_arg(node: js_ast.JSArg) -> str:
@@ -108,10 +197,10 @@ def generate_js_arguments(node: js_ast.JSArguments) -> str:
     return ', '.join(args)
 
 
-def generate_js_body(nodes: [js_ast.JSStatement], indent: int = 0) -> str:
-    result = []
-    for node in nodes:
-        str_indent = indent * 4 * ' '
-        js_code = generate_js_statement(node)
-        result.append(str_indent + js_code)
+def generate_js_body(nodes: [js_ast.JSStatement]) -> str:
+    result = [generate_js_statement(node) for node in nodes]
     return '\n'.join(result)
+
+
+def generate_js_eq(node: js_ast.JSEq) -> str:
+    return '==='

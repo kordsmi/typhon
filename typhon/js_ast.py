@@ -30,6 +30,9 @@ class JSNode:
         args_str = ', '.join(args)
         return f'{self.__class__.__module__}.{self.__class__.__name__}({args_str})'
 
+    def __str__(self):
+        return repr(self)
+
 
 class JSExpression(JSNode):
     pass
@@ -40,6 +43,10 @@ class JSStatement(JSNode):
 
 
 class JSOperator(JSNode):
+    pass
+
+
+class JSCmpOp(JSNode):
     pass
 
 
@@ -159,3 +166,87 @@ class JSReturn(JSStatement):
 
     def __init__(self, value: JSExpression):
         super().__init__(value=value)
+
+
+class JSList(JSExpression):
+    _fields = (
+        'elts',
+    )
+
+    def __init__(self, elts: [JSExpression]):
+        super().__init__(elts=elts)
+
+
+class JSDict(JSExpression):
+    _fields = (
+        'keys',
+        'values',
+    )
+
+    def __init__(self, keys: [JSExpression], values: [JSExpression]):
+        super().__init__(keys=keys, values=values)
+
+
+class JSWhile(JSStatement):
+    _fields = (
+        'test',
+        'body',
+        'orelse',
+    )
+
+    def __init__(self, test: JSExpression, body: [JSStatement], orelse: [JSStatement] = None):
+        super().__init__(test=test, body=body, orelse=orelse)
+
+
+class JSEq(JSCmpOp):
+    pass
+
+
+class JSCompare(JSExpression):
+    _fields = (
+        'left',
+        'op',
+        'right',
+    )
+
+    def __init__(self, left: JSExpression, op: JSCmpOp, right: JSExpression):
+        super().__init__(left=left, op=op, right=right)
+
+
+class JSIf(JSStatement):
+    _fields = (
+        'test',
+        'body',
+        'orelse',
+    )
+
+    def __init__(self, test: JSExpression, body: [JSStatement], orelse: [JSStatement] = None):
+        super().__init__(test=test, body=body, orelse=orelse)
+
+
+class JSThrow(JSStatement):
+    _fields = (
+        'exc',
+    )
+
+    def __init__(self, exc: JSExpression):
+        super().__init__(exc=exc)
+
+
+class JSTry(JSStatement):
+    _fields = (
+        'body',
+        'catch',
+        'finalbody',
+    )
+
+    def __init__(self, body: [JSStatement], catch: [JSStatement], finalbody: [JSStatement] = None):
+        super().__init__(body=body, catch=catch, finalbody=finalbody)
+
+
+class JSContinue(JSStatement):
+    pass
+
+
+class JSBreak(JSStatement):
+    pass
