@@ -3,7 +3,8 @@ from typing import Optional, List
 
 from typhon import js_ast
 from typhon.exceptions import InvalidNode
-from typhon.generator import generate_js_body
+from typhon.generator import generate_js_module
+from typhon.js_analyzer import get_module_info
 
 
 class Transpiler:
@@ -21,10 +22,12 @@ class Transpiler:
         self.py_tree = ast.parse(self.src)
 
     def transpile_src(self):
-        self.js_tree = transpile_body(self.py_tree.body)
+        self.js_tree = transpile_module(self.py_tree)
 
     def generate_js(self):
-        return generate_js_body(self.js_tree)
+        info = get_module_info(self.js_tree)
+        self.js_tree.export = js_ast.JSExport(info)
+        return generate_js_module(self.js_tree)
 
 
 def transpile(src: str) -> str:
@@ -249,3 +252,7 @@ def transpile_body(node: [ast.stmt]) -> [js_ast.JSStatement]:
 
 def transpile_eq(node: ast.Eq) -> js_ast.JSEq:
     return js_ast.JSEq()
+
+
+def transpile_module(node: ast.Module) -> js_ast.JSModule:
+    return js_ast.JSModule(transpile_body(node.body))

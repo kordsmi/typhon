@@ -8,7 +8,7 @@ from typhon.exceptions import UnsupportedNode
 from typhon.generator import generate_js_name, generate_js_constant, generate_js_expression, generate_js_bin_op, \
     generate_js_call, generate_js_code_expression, generate_js_statement, generate_js_arg, generate_js_arguments, \
     generate_js_return, generate_js_eq, generate_code_block, generate_js_dict, generate_expression_list, \
-    generate_js_assign
+    generate_js_assign, generate_js_module
 from typhon.transpiler import transpile_arguments
 
 
@@ -293,6 +293,12 @@ def test_generate_arguments__universal():
     assert result == expected
 
 
+def test_generate_arguments__none():
+    js_node = js_ast.JSArguments(None)
+    result = generate_js_arguments(js_node)
+    assert result == ''
+
+
 def test_generate_return():
     js_node = js_ast.JSReturn(js_ast.JSConstant(100))
 
@@ -393,3 +399,18 @@ def test_generate_js_assign__to_subscript():
     result = generate_js_assign(js_node)
 
     assert result == "a[c] = 1;"
+
+
+def test_generate_js_module():
+    js_node = js_ast.JSModule(body=[js_ast.JSCodeExpression(js_ast.JSName('a'))])
+    result = generate_js_module(js_node)
+    assert result == 'a;'
+
+
+def test_generate_js_module_with_export():
+    js_node = js_ast.JSModule(body=[js_ast.JSCodeExpression(js_ast.JSName('a'))])
+    js_node.export = js_ast.JSExport(['a'])
+
+    result = generate_js_module(js_node)
+
+    assert result == 'export {a};\n\na;'

@@ -6,12 +6,12 @@ from typhon import js_ast
 from typhon.exceptions import InvalidNode
 from typhon.transpiler import transpile, transpile_bin_op, transpile_call, transpile_assign, transpile_expression, \
     Transpiler, transpile_arg, transpile_arguments, transpile_statement, transpile_function_def, transpile_return, \
-    transpile_arg_list, transpile_expression_list, transpile_body, transpile_constant, transpile_eq
+    transpile_arg_list, transpile_expression_list, transpile_body, transpile_constant, transpile_eq, transpile_module
 
 
 def test_transpiler():
     py_str = 'print(1 + 2)'
-    js_str = 'console.log(1 + 2);'
+    js_str = 'export {};\n\nconsole.log(1 + 2);'
 
     result = transpile(py_str)
 
@@ -27,13 +27,13 @@ print('a + 2 = ', a + 2)'''
 
         transpiler.transpile_src()
 
-        expected = [
+        expected = js_ast.JSModule(body=[
             js_ast.JSAssign(target=js_ast.JSName(id='a'), value=js_ast.JSConstant(value=1)),
             js_ast.JSCodeExpression(js_ast.JSCall(func='console.log', args=[
                 js_ast.JSConstant(value='a + 2 = '),
                 js_ast.JSBinOp(left=js_ast.JSName(id='a'), op=js_ast.JSAdd(), right=js_ast.JSConstant(value=2)),
             ]))
-        ]
+        ])
         assert transpiler.js_tree == expected
 
     def test_transpile_function(self):
@@ -44,9 +44,9 @@ print('a + 2 = ', a + 2)'''
 
         transpiler.transpile_src()
 
-        expected = [transpile_function_def(transpiler.py_tree.body[0])]
+        expected = js_ast.JSModule([transpile_function_def(transpiler.py_tree.body[0])])
         assert transpiler.js_tree == expected
-        assert transpiler.js_tree[0].body[0] == transpile_return(transpiler.py_tree.body[0].body[0])
+        assert transpiler.js_tree.body[0].body[0] == transpile_return(transpiler.py_tree.body[0].body[0])
 
 
 def test_transpile_set_variable__int():
@@ -466,3 +466,9 @@ def test_transpile_eq():
     node = ast.Eq()
     js_node = transpile_eq(node)
     assert js_node == js_ast.JSEq()
+
+
+def test_transpile_module():
+    node = ast.Module(body=[ast.Expr(ast.Name(id='a', ctx=ast.Load()))])
+    js_node = transpile_module(node)
+    assert js_node == js_ast.JSModule(body=[js_ast.JSCodeExpression(js_ast.JSName('a'))])

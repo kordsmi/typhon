@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Optional
 
 
 class JSNode:
@@ -278,3 +278,22 @@ class JSStatements(JSNode):
 
     def __init__(self, statements: [JSStatement]):
         super().__init__(statements=statements)
+
+
+class JSExport(JSNode):
+    _fields = (
+        'ids',
+    )
+
+    def __init__(self, ids: [str]):
+        super().__init__(ids=ids)
+
+
+class JSModule(JSNode):
+    _fields = (
+        'body',
+        'export',
+    )
+
+    def __init__(self, body: [JSStatement], export: Optional[JSExport] = None):
+        super().__init__(body=body, export=export)

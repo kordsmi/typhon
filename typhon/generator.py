@@ -196,10 +196,11 @@ def generate_js_arguments(node: js_ast.JSArguments) -> str:
         pass
 
     args = []
+    node_args = node.args or []
     defaults = node.defaults or []
-    args_without_values = len(node.args) - len(defaults)
+    args_without_values = len(node_args) - len(defaults)
 
-    for arg, value in zip(node.args, chain(repeat(Empty, args_without_values), defaults)):
+    for arg, value in zip(node_args, chain(repeat(Empty, args_without_values), defaults)):
         arg_str = generate_js_arg(arg)
         if value != Empty:
             arg_str = f'{arg_str}={generate_js_expression(value)}'
@@ -219,3 +220,15 @@ def generate_js_body(nodes: [js_ast.JSStatement]) -> str:
 
 def generate_js_eq(node: js_ast.JSEq) -> str:
     return '==='
+
+
+def generate_js_module(node: js_ast.JSModule) -> str:
+    result = ''
+    if node.export:
+        result = generate_js_export(node.export) + '\n\n'
+    return result + generate_js_body(node.body)
+
+
+def generate_js_export(node: js_ast.JSExport) -> str:
+    ids_str = ', '.join(node.ids)
+    return f'export {{{ids_str}}};'
