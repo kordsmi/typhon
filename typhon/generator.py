@@ -42,20 +42,29 @@ def generate_js_list(node: js_ast.JSList) -> str:
 
 
 def generate_expression_list(expr_list: [js_ast.JSExpression]) -> [str]:
+    if expr_list is None:
+        return []
     return [generate_js_expression(element) for element in expr_list]
 
 
 def generate_js_dict(node: js_ast.JSDict) -> str:
-    named_args_list = [
-        f'{generate_js_expression(key)}: {generate_js_expression(value)}'
-        for key, value in zip(node.keys, node.values)
-    ]
+    if node.keys:
+        named_args_list = [
+            f'{generate_js_expression(key)}: {generate_js_expression(value)}'
+            for key, value in zip(node.keys, node.values)
+        ]
+    else:
+        named_args_list = []
     named_args_str = ', '.join(named_args_list)
     return f'{{{named_args_str}}}'
 
 
 def generate_js_compare(node: js_ast.JSCompare) -> str:
     return f'{generate_js_expression(node.left)} {generate_js_eq(node.op)} {generate_js_expression(node.right)}'
+
+
+def generate_js_subscript(node: js_ast.JSSubscript) -> str:
+    return f'{generate_js_expression(node.value)}[{generate_js_expression(node.slice)}]'
 
 
 EXPRESSION_GENERATOR_FUNCTIONS = {
@@ -66,6 +75,7 @@ EXPRESSION_GENERATOR_FUNCTIONS = {
     js_ast.JSList: generate_js_list,
     js_ast.JSDict: generate_js_dict,
     js_ast.JSCompare: generate_js_compare,
+    js_ast.JSSubscript: generate_js_subscript,
 }
 
 
@@ -78,7 +88,7 @@ def generate_js_expression(node: js_ast.JSExpression) -> str:
 
 
 def generate_js_assign(node: js_ast.JSAssign) -> str:
-    return f'{generate_js_name(node.target)} = {generate_js_expression(node.value)};'
+    return f'{generate_js_expression(node.target)} = {generate_js_expression(node.value)};'
 
 
 def generate_js_code_expression(node: js_ast.JSCodeExpression) -> str:
@@ -146,6 +156,10 @@ def generate_js_break(node: js_ast.JSBreak) -> str:
     return 'break;'
 
 
+def generate_js_delete(node: js_ast.JSDelete) -> str:
+    return f'delete {generate_js_expression(node.target)};'
+
+
 STATEMENT_GENERATOR_FUNCTIONS = {
     js_ast.JSAssign: generate_js_assign,
     js_ast.JSCodeExpression: generate_js_code_expression,
@@ -157,6 +171,7 @@ STATEMENT_GENERATOR_FUNCTIONS = {
     js_ast.JSTry: generate_js_try,
     js_ast.JSContinue: generate_js_continue,
     js_ast.JSBreak: generate_js_break,
+    js_ast.JSDelete: generate_js_delete,
 }
 
 

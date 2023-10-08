@@ -5,9 +5,10 @@ import pytest
 from tests.test_transpiler import _create_arguments_node
 from typhon import js_ast, generator
 from typhon.exceptions import UnsupportedNode
-from typhon.generator import generate_js_name, generate_js_constant, generate_js_expression, generate_js_bin_op,\
-    generate_js_call, generate_js_code_expression, generate_js_statement, generate_js_arg, generate_js_arguments,\
-    generate_js_return, generate_js_eq, generate_code_block
+from typhon.generator import generate_js_name, generate_js_constant, generate_js_expression, generate_js_bin_op, \
+    generate_js_call, generate_js_code_expression, generate_js_statement, generate_js_arg, generate_js_arguments, \
+    generate_js_return, generate_js_eq, generate_code_block, generate_js_dict, generate_expression_list, \
+    generate_js_assign
 from typhon.transpiler import transpile_arguments
 
 
@@ -117,6 +118,12 @@ def test_generate_js_statement__break():
     assert result == 'break;'
 
 
+def test_generate_js_statement__delete():
+    node = js_ast.JSDelete(js_ast.JSName('d'))
+    result = generate_js_statement(node)
+    assert result == 'delete d;'
+
+
 def test_generate_js_name():
     js_node = js_ast.JSName(id='a')
 
@@ -216,6 +223,12 @@ def test_generate_js_expression__unsupported_node():
 
     with pytest.raises(UnsupportedNode):
         generate_js_expression(js_node)
+
+
+def test_generate_js_expression__subscript():
+    js_node = js_ast.JSSubscript(js_ast.JSName('a'), js_ast.JSConstant('c'))
+    result = generate_js_expression(js_node)
+    assert result == "a['c']"
 
 
 def test_generate_js_bin_op():
@@ -358,3 +371,25 @@ def test_generate_code_block__with_error():
         generate_code_block([node])
 
     assert generator.code_block_indent == 0
+
+
+def test_generate_js_dict__empty():
+    js_node = js_ast.JSDict(keys=None, values=None)
+    result = generate_js_dict(js_node)
+    assert result == "{}"
+
+
+def test_generate_expression_list__empty():
+    result = generate_expression_list(None)
+    assert result == []
+
+
+def test_generate_js_assign__to_subscript():
+    js_node = js_ast.JSAssign(
+        target=js_ast.JSSubscript(js_ast.JSName('a'), js_ast.JSName('c')),
+        value=js_ast.JSConstant(1),
+    )
+
+    result = generate_js_assign(js_node)
+
+    assert result == "a[c] = 1;"

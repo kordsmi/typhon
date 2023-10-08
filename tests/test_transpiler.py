@@ -80,6 +80,21 @@ def test_transpile_set_variable__expression():
     assert result == expected
 
 
+def test_transpile_set_variable__to_subscript():
+    assign_node = ast.Assign(
+        targets=[ast.Subscript(value=ast.Name(id='a'), slice=ast.Name(id='c'), ctx=ast.Store())],
+        value=ast.Constant(value=1),
+    )
+
+    result = transpile_assign(assign_node)
+
+    expected = js_ast.JSAssign(
+        target=js_ast.JSSubscript(js_ast.JSName('a'), js_ast.JSName('c')),
+        value=js_ast.JSConstant(1),
+    )
+    assert result == expected
+
+
 def test_transpile_bin_op():
     bin_op_node = ast.BinOp(left=ast.Constant(value=1), op=ast.Add(), right=ast.Constant(value=2))
 
@@ -221,6 +236,12 @@ def test_transpile_expression__compare():
     assert js_node == js_ast.JSCompare(left=js_ast.JSName('a'), op=js_ast.JSEq(), right=js_ast.JSConstant(1))
 
 
+def test_transpile_expression__subscript():
+    node = ast.Subscript(value=ast.Name(id='a', ctx=ast.Load()), slice=ast.Constant(value='c'), ctx=ast.Store())
+    js_node = transpile_expression(node)
+    assert js_node == js_ast.JSSubscript(js_ast.JSName('a'), js_ast.JSConstant('c'))
+
+
 def test_transpile_arg():
     node = ast.arg(arg='a')
 
@@ -312,12 +333,36 @@ def test_transpile_return():
     assert js_node == expected
 
 
+def test_transpile_statement__delete():
+    node = ast.Delete(targets=[ast.Name(id='d')])
+    js_node = transpile_statement(node)
+    assert js_node == js_ast.JSStatements([js_ast.JSDelete(target=js_ast.JSName(id='d'))])
+
+
+def test_transpile_statement__delete_multiple():
+    node = ast.Delete(targets=[ast.Name(id='d'), ast.Name(id='e')])
+
+    js_node = transpile_statement(node)
+
+    expected = js_ast.JSStatements([
+        js_ast.JSDelete(target=js_ast.JSName(id='d')),
+        js_ast.JSDelete(target=js_ast.JSName(id='e')),
+    ])
+    assert js_node == expected
+
+
 def test_transpile_body__with_pass():
     body = [ast.Pass()]
 
     js_body = transpile_body(body)
 
     assert js_body == []
+
+
+def test_transpile_body__statements():
+    body = [ast.Delete(targets=[ast.Name(id='d'), ast.Name(id='e')])]
+    js_body = transpile_body(body)
+    assert js_body == [js_ast.JSDelete(js_ast.JSName('d')), js_ast.JSDelete(js_ast.JSName('e'))]
 
 
 def test_transpile_statement__while():

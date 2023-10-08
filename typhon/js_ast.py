@@ -106,7 +106,7 @@ class JSAssign(JSStatement):
         'value',
     )
 
-    def __init__(self, target: JSName, value: JSExpression):
+    def __init__(self, target: JSExpression, value: JSExpression):
         super().__init__(target=target, value=value)
 
 
@@ -250,3 +250,31 @@ class JSContinue(JSStatement):
 
 class JSBreak(JSStatement):
     pass
+
+
+class JSSubscript(JSExpression):
+    _fields = (
+        'value',
+        'slice',
+    )
+
+    def __init__(self, value: JSExpression, slice: JSExpression):
+        super().__init__(value=value, slice=slice)
+
+
+class JSDelete(JSStatement):
+    _fields = (
+        'target',
+    )
+
+    def __init__(self, target: JSExpression):
+        super().__init__(target=target)
+
+
+class JSStatements(JSNode):
+    _fields = (
+        'statements',
+    )
+
+    def __init__(self, statements: [JSStatement]):
+        super().__init__(statements=statements)

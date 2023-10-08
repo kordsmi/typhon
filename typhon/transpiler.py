@@ -89,6 +89,10 @@ def transpile_compare(node: ast.Compare) -> js_ast.JSCompare:
     )
 
 
+def transpile_subscript(node: ast.Subscript) -> js_ast.JSSubscript:
+    return js_ast.JSSubscript(value=transpile_expression(node.value), slice=transpile_expression(node.slice))
+
+
 EXPRESSION_TRANSPILER_FUNCTIONS = {
     ast.Name: transpile_name,
     ast.Constant: transpile_constant,
@@ -100,6 +104,7 @@ EXPRESSION_TRANSPILER_FUNCTIONS = {
     ast.Set: transpile_set,
     ast.Dict: transpile_dict,
     ast.Compare: transpile_compare,
+    ast.Subscript: transpile_subscript,
 }
 
 
@@ -111,9 +116,9 @@ def transpile_expression(node: ast.expr) -> js_ast.JSExpression:
 
 
 def transpile_assign(node: ast.Assign) -> js_ast.JSAssign:
-    target: ast.Name = node.targets[0]
+    target: ast.expr = node.targets[0]
     value: ast.expr = node.value
-    js_target = transpile_name(target)
+    js_target = transpile_expression(target)
     js_value = transpile_expression(value)
     return js_ast.JSAssign(target=js_target, value=js_value)
 
@@ -179,6 +184,11 @@ def transpile_break(node: ast.Break) -> js_ast.JSBreak:
     return js_ast.JSBreak()
 
 
+def transpile_del(node: ast.Delete) -> js_ast.JSStatements:
+    statements = [js_ast.JSDelete(transpile_expression(target)) for target in node.targets]
+    return js_ast.JSStatements(statements=statements)
+
+
 STATEMENT_TRANSPILER_FUNCTIONS = {
     ast.Assign: transpile_assign,
     ast.Expr: transpile_code_expression,
@@ -190,6 +200,7 @@ STATEMENT_TRANSPILER_FUNCTIONS = {
     ast.Try: transpile_try,
     ast.Continue: transpile_continue,
     ast.Break: transpile_break,
+    ast.Delete: transpile_del,
 }
 
 
@@ -224,11 +235,16 @@ def transpile_arguments(node: ast.arguments) -> js_ast.JSArguments:
 
 
 def transpile_body(node: [ast.stmt]) -> [js_ast.JSStatement]:
-    return [
-        transpile_statement(expr)
-        for expr in node
-        if not isinstance(expr, ast.Pass)
-    ]
+    result = []
+    for expr in node:
+        if isinstance(expr, ast.Pass):
+            continue
+        js_statement = transpile_statement(expr)
+        if isinstance(js_statement, js_ast.JSStatements):
+            result.extend(js_statement.statements)
+        else:
+            result.append(js_statement)
+    return result
 
 
 def transpile_eq(node: ast.Eq) -> js_ast.JSEq:
