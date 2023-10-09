@@ -7,7 +7,7 @@ from typhon import js_ast, generator
 from typhon.exceptions import UnsupportedNode
 from typhon.generator import generate_js_name, generate_js_constant, generate_js_expression, generate_js_bin_op, \
     generate_js_call, generate_js_code_expression, generate_js_statement, generate_js_arg, generate_js_arguments, \
-    generate_js_return, generate_js_eq, generate_code_block, generate_js_dict, generate_expression_list, \
+    generate_js_return, generate_js_eq, generate_js_code_block, generate_js_dict, generate_expression_list, \
     generate_js_assign, generate_js_module
 from typhon.transpiler import transpile_arguments
 
@@ -35,11 +35,23 @@ def test_generate_js_statement__assign():
     assert result == js_str
 
 
+def test_generate_js_statement__let():
+    js_node = js_ast.JSLet(assign=js_ast.JSAssign(
+        target=js_ast.JSName(id='v'),
+        value=js_ast.JSConstant(value=2)
+    ))
+    js_str = 'let v = 2;'
+
+    result = generate_js_statement(js_node)
+
+    assert result == js_str
+
+
 def test_generate_statement__function_def():
     js_node = js_ast.JSFunctionDef(
         'bar',
         js_ast.JSArguments([js_ast.JSArg('foo')]),
-        [js_ast.JSReturn(js_ast.JSConstant(5))],
+        js_ast.JSCodeBlock([js_ast.JSReturn(js_ast.JSConstant(5))]),
     )
 
     result = generate_js_statement(js_node)
@@ -51,7 +63,7 @@ def test_generate_statement__function_def():
 
 
 def test_generate_js_statement__while():
-    node = js_ast.JSWhile(test=js_ast.JSConstant(value=True), body=[])
+    node = js_ast.JSWhile(test=js_ast.JSConstant(value=True), body=js_ast.JSCodeBlock([]))
     result = generate_js_statement(node)
     assert result == 'while true {\n}'
 
@@ -59,8 +71,8 @@ def test_generate_js_statement__while():
 def test_generate_js_statement__while_else():
     node = js_ast.JSWhile(
         test=js_ast.JSConstant(value=True),
-        body=[],
-        orelse=[js_ast.JSCodeExpression(js_ast.JSName('a'))],
+        body=js_ast.JSCodeBlock([]),
+        orelse=js_ast.JSCodeBlock([js_ast.JSCodeExpression(js_ast.JSName('a'))]),
     )
 
     result = generate_js_statement(node)
@@ -71,7 +83,7 @@ def test_generate_js_statement__while_else():
 def test_generate_js_statement__if():
     node = js_ast.JSIf(
         test=js_ast.JSConstant(value=True),
-        body=[js_ast.JSCodeExpression(js_ast.JSName('a'))],
+        body=js_ast.JSCodeBlock([js_ast.JSCodeExpression(js_ast.JSName('a'))]),
     )
 
     result = generate_js_statement(node)
@@ -85,9 +97,12 @@ def test_generate_js_statement__if():
 def test_generate_js_statement__indents():
     node = js_ast.JSWhile(
         test=js_ast.JSConstant(value=True),
-        body=[
-            js_ast.JSWhile(test=js_ast.JSConstant(value=True), body=[js_ast.JSReturn(value=js_ast.JSConstant(None))])
-        ]
+        body=js_ast.JSCodeBlock([
+            js_ast.JSWhile(
+                test=js_ast.JSConstant(value=True),
+                body=js_ast.JSCodeBlock([js_ast.JSReturn(value=js_ast.JSConstant(None))])
+            )
+        ])
     )
 
     result = generate_js_statement(node)
@@ -317,11 +332,11 @@ def test_generate_js_eq():
 def test_generate_code_block__if_with_else():
     node = js_ast.JSIf(
         test=js_ast.JSConstant(value=True),
-        body=[js_ast.JSCodeExpression(js_ast.JSName('a'))],
-        orelse=[js_ast.JSCodeExpression(js_ast.JSConstant(2))],
+        body=js_ast.JSCodeBlock([js_ast.JSCodeExpression(js_ast.JSName('a'))]),
+        orelse=js_ast.JSCodeBlock([js_ast.JSCodeExpression(js_ast.JSConstant(2))]),
     )
 
-    result = generate_code_block([node])
+    result = generate_js_code_block(js_ast.JSCodeBlock([node]))
 
     expected = '''{
     if (true) {
@@ -335,20 +350,20 @@ def test_generate_code_block__if_with_else():
 
 def test_generate_code_block__try_catch_finally():
     node = js_ast.JSTry(
-        body=[js_ast.JSCodeExpression(js_ast.JSName('a'))],
-        catch=[js_ast.JSIf(
+        body=js_ast.JSCodeBlock([js_ast.JSCodeExpression(js_ast.JSName('a'))]),
+        catch=js_ast.JSCodeBlock([js_ast.JSIf(
             test=js_ast.JSCompare(js_ast.JSName('e.name'), js_ast.JSEq(), js_ast.JSConstant('Exception')),
-            body=[js_ast.JSCodeExpression(js_ast.JSName('b'))],
-            orelse=[js_ast.JSIf(
+            body=js_ast.JSCodeBlock([js_ast.JSCodeExpression(js_ast.JSName('b'))]),
+            orelse=js_ast.JSCodeBlock([js_ast.JSIf(
                 test=js_ast.JSCompare(js_ast.JSName('e.name'), js_ast.JSEq(), js_ast.JSConstant('AttributeError')),
-                body=[js_ast.JSCodeExpression(js_ast.JSName('c'))],
-                orelse=[js_ast.JSCodeExpression(js_ast.JSName('d'))]
-            )]
-        )],
-        finalbody=[js_ast.JSCodeExpression(js_ast.JSName('e'))],
+                body=js_ast.JSCodeBlock([js_ast.JSCodeExpression(js_ast.JSName('c'))]),
+                orelse=js_ast.JSCodeBlock([js_ast.JSCodeExpression(js_ast.JSName('d'))]),
+            )]),
+        )]),
+        finalbody=js_ast.JSCodeBlock([js_ast.JSCodeExpression(js_ast.JSName('e'))]),
     )
 
-    result = generate_code_block([node])
+    result = generate_js_code_block(js_ast.JSCodeBlock([node]))
 
     expected = '''{
     try {
@@ -374,7 +389,7 @@ def test_generate_code_block__with_error():
     node = js_ast.JSCodeExpression(js_ast.JSAdd())
 
     with pytest.raises(UnsupportedNode):
-        generate_code_block([node])
+        generate_js_code_block(js_ast.JSCodeBlock([node]))
 
     assert generator.code_block_indent == 0
 
@@ -402,13 +417,13 @@ def test_generate_js_assign__to_subscript():
 
 
 def test_generate_js_module():
-    js_node = js_ast.JSModule(body=[js_ast.JSCodeExpression(js_ast.JSName('a'))])
+    js_node = js_ast.JSModule(body=js_ast.JSCodeBlock([js_ast.JSCodeExpression(js_ast.JSName('a'))]))
     result = generate_js_module(js_node)
     assert result == 'a;'
 
 
 def test_generate_js_module_with_export():
-    js_node = js_ast.JSModule(body=[js_ast.JSCodeExpression(js_ast.JSName('a'))])
+    js_node = js_ast.JSModule(body=js_ast.JSCodeBlock([js_ast.JSCodeExpression(js_ast.JSName('a'))]))
     js_node.export = js_ast.JSExport(['a'])
 
     result = generate_js_module(js_node)

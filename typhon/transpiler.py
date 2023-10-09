@@ -4,7 +4,7 @@ from typing import Optional, List
 from typhon import js_ast
 from typhon.exceptions import InvalidNode
 from typhon.generator import generate_js_module
-from typhon.js_analyzer import get_module_info
+from typhon.js_analyzer import transform_module
 
 
 class Transpiler:
@@ -25,8 +25,7 @@ class Transpiler:
         self.js_tree = transpile_module(self.py_tree)
 
     def generate_js(self):
-        info = get_module_info(self.js_tree)
-        self.js_tree.export = js_ast.JSExport(info)
+        transform_module(self.js_tree)
         return generate_js_module(self.js_tree)
 
 
@@ -170,7 +169,7 @@ def transpile_try(node: ast.Try) -> js_ast.JSTry:
             body=transpile_body(exception_handler.body),
             orelse=prev_if
         )
-        prev_if = [if_statement]
+        prev_if = js_ast.JSCodeBlock([if_statement])
 
     return js_ast.JSTry(
         body=transpile_body(node.body),
@@ -237,17 +236,17 @@ def transpile_arguments(node: ast.arguments) -> js_ast.JSArguments:
                               kwonlyargs=kwonlyargs, kw_defaults=kw_defaults, kwarg=kwarg)
 
 
-def transpile_body(node: [ast.stmt]) -> [js_ast.JSStatement]:
-    result = []
+def transpile_body(node: [ast.stmt]) -> js_ast.JSCodeBlock:
+    code_block = []
     for expr in node:
         if isinstance(expr, ast.Pass):
             continue
         js_statement = transpile_statement(expr)
         if isinstance(js_statement, js_ast.JSStatements):
-            result.extend(js_statement.statements)
+            code_block.extend(js_statement.statements)
         else:
-            result.append(js_statement)
-    return result
+            code_block.append(js_statement)
+    return js_ast.JSCodeBlock(code_block)
 
 
 def transpile_eq(node: ast.Eq) -> js_ast.JSEq:

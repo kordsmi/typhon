@@ -27,13 +27,13 @@ print('a + 2 = ', a + 2)'''
 
         transpiler.transpile_src()
 
-        expected = js_ast.JSModule(body=[
+        expected = js_ast.JSModule(body=js_ast.JSCodeBlock([
             js_ast.JSAssign(target=js_ast.JSName(id='a'), value=js_ast.JSConstant(value=1)),
             js_ast.JSCodeExpression(js_ast.JSCall(func='console.log', args=[
                 js_ast.JSConstant(value='a + 2 = '),
                 js_ast.JSBinOp(left=js_ast.JSName(id='a'), op=js_ast.JSAdd(), right=js_ast.JSConstant(value=2)),
             ]))
-        ])
+        ]))
         assert transpiler.js_tree == expected
 
     def test_transpile_function(self):
@@ -44,9 +44,10 @@ print('a + 2 = ', a + 2)'''
 
         transpiler.transpile_src()
 
-        expected = js_ast.JSModule([transpile_function_def(transpiler.py_tree.body[0])])
+        expected = js_ast.JSModule(js_ast.JSCodeBlock([transpile_function_def(transpiler.py_tree.body[0])]))
         assert transpiler.js_tree == expected
-        assert transpiler.js_tree.body[0].body[0] == transpile_return(transpiler.py_tree.body[0].body[0])
+        assert transpiler.js_tree.body.code_block[0].body.code_block[0] == \
+               transpile_return(transpiler.py_tree.body[0].body[0])
 
 
 def test_transpile_set_variable__int():
@@ -319,7 +320,7 @@ def test_transpile_function_def():
     expected = js_ast.JSFunctionDef(
         name='foo',
         args=transpile_arguments(arguments_node),
-        body=[transpile_statement(assign_statement)]
+        body=js_ast.JSCodeBlock([transpile_statement(assign_statement)]),
     )
     assert js_node == expected
 
@@ -356,13 +357,13 @@ def test_transpile_body__with_pass():
 
     js_body = transpile_body(body)
 
-    assert js_body == []
+    assert js_body == js_ast.JSCodeBlock([])
 
 
 def test_transpile_body__statements():
     body = [ast.Delete(targets=[ast.Name(id='d'), ast.Name(id='e')])]
     js_body = transpile_body(body)
-    assert js_body == [js_ast.JSDelete(js_ast.JSName('d')), js_ast.JSDelete(js_ast.JSName('e'))]
+    assert js_body == js_ast.JSCodeBlock([js_ast.JSDelete(js_ast.JSName('d')), js_ast.JSDelete(js_ast.JSName('e'))])
 
 
 def test_transpile_statement__while():
@@ -370,7 +371,7 @@ def test_transpile_statement__while():
 
     js_node = transpile_statement(node)
 
-    expected = js_ast.JSWhile(test=js_ast.JSConstant(value=True), body=[])
+    expected = js_ast.JSWhile(test=js_ast.JSConstant(value=True), body=js_ast.JSCodeBlock([]))
     assert js_node == expected
 
 
@@ -385,8 +386,8 @@ def test_transpile_statement__while_else():
 
     expected = js_ast.JSWhile(
         test=js_ast.JSConstant(value=True),
-        body=[],
-        orelse=[js_ast.JSCodeExpression(js_ast.JSName('a'))],
+        body=js_ast.JSCodeBlock([]),
+        orelse=js_ast.JSCodeBlock([js_ast.JSCodeExpression(js_ast.JSName('a'))]),
     )
     assert js_node == expected
 
@@ -396,7 +397,11 @@ def test_transpile_statement__if():
 
     js_node = transpile_statement(node)
 
-    expected = js_ast.JSIf(test=js_ast.JSConstant(value=True), body=[], orelse=[])
+    expected = js_ast.JSIf(
+        test=js_ast.JSConstant(value=True),
+        body=js_ast.JSCodeBlock([]),
+        orelse=js_ast.JSCodeBlock([]),
+    )
     assert js_node == expected
 
 
@@ -429,17 +434,17 @@ def test_transpile_statement__try():
     js_node = transpile_statement(node)
 
     expected = js_ast.JSTry(
-        body=[js_ast.JSCodeExpression(js_ast.JSName('a'))],
-        catch=[js_ast.JSIf(
+        body=js_ast.JSCodeBlock([js_ast.JSCodeExpression(js_ast.JSName('a'))]),
+        catch=js_ast.JSCodeBlock([js_ast.JSIf(
             test=js_ast.JSCompare(js_ast.JSName('e.name'), js_ast.JSEq(), js_ast.JSName('Exception')),
-            body=[js_ast.JSCodeExpression(js_ast.JSName('b'))],
-            orelse=[js_ast.JSIf(
+            body=js_ast.JSCodeBlock([js_ast.JSCodeExpression(js_ast.JSName('b'))]),
+            orelse=js_ast.JSCodeBlock([js_ast.JSIf(
                 test=js_ast.JSCompare(js_ast.JSName('e.name'), js_ast.JSEq(), js_ast.JSName('AttributeError')),
-                body=[js_ast.JSCodeExpression(js_ast.JSName('c'))],
-                orelse=[js_ast.JSCodeExpression(js_ast.JSName('d'))]
-            )]
-        )],
-        finalbody=[js_ast.JSCodeExpression(js_ast.JSName('e'))],
+                body=js_ast.JSCodeBlock([js_ast.JSCodeExpression(js_ast.JSName('c'))]),
+                orelse=js_ast.JSCodeBlock([js_ast.JSCodeExpression(js_ast.JSName('d'))]),
+            )]),
+        )]),
+        finalbody=js_ast.JSCodeBlock([js_ast.JSCodeExpression(js_ast.JSName('e'))]),
     )
     assert js_node == expected
 
@@ -471,4 +476,4 @@ def test_transpile_eq():
 def test_transpile_module():
     node = ast.Module(body=[ast.Expr(ast.Name(id='a', ctx=ast.Load()))])
     js_node = transpile_module(node)
-    assert js_node == js_ast.JSModule(body=[js_ast.JSCodeExpression(js_ast.JSName('a'))])
+    assert js_node == js_ast.JSModule(body=js_ast.JSCodeBlock([js_ast.JSCodeExpression(js_ast.JSName('a'))]))

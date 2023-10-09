@@ -100,28 +100,28 @@ def generate_js_return(node: js_ast.JSReturn) -> str:
 
 
 def generate_js_function_def(node: js_ast.JSFunctionDef) -> str:
-    code_block = generate_code_block(node.body)
+    code_block = generate_js_code_block(node.body)
     return f'function {node.name}({generate_js_arguments(node.args)}) {code_block}'
 
 
 def generate_js_while(node: js_ast.JSWhile) -> str:
     test_str = generate_js_expression(node.test)
-    while_body = generate_code_block(node.body)
+    while_body = generate_js_code_block(node.body)
     else_body = ''
     if node.orelse:
-        else_body = ' else ' + generate_code_block(node.orelse)
+        else_body = ' else ' + generate_js_code_block(node.orelse)
     return f'while {test_str} {while_body}{else_body}'
 
 
 code_block_indent = 0
 
 
-def generate_code_block(body: [js_ast.JSStatement]) -> str:
+def generate_js_code_block(body: js_ast.JSCodeBlock) -> str:
     global code_block_indent
 
     code_block_indent += 1
     try:
-        js_body_str = generate_js_body(body)
+        js_body_str = generate_js_body(body.code_block)
     finally:
         code_block_indent -= 1
     if js_body_str:
@@ -130,8 +130,8 @@ def generate_code_block(body: [js_ast.JSStatement]) -> str:
 
 
 def generate_js_if(node: js_ast.JSIf) -> str:
-    if_str = f'if ({generate_js_expression(node.test)}) {generate_code_block(node.body)}'
-    else_str = f' else {generate_code_block(node.orelse)}' if node.orelse else ''
+    if_str = f'if ({generate_js_expression(node.test)}) {generate_js_code_block(node.body)}'
+    else_str = f' else {generate_js_code_block(node.orelse)}' if node.orelse else ''
     return if_str + else_str
 
 
@@ -140,11 +140,11 @@ def generate_js_throw(node: js_ast.JSThrow) -> str:
 
 
 def generate_js_try(node: js_ast.JSTry) -> str:
-    try_str = f'try {generate_code_block(node.body)}'
-    catch_str = f' catch (e) {generate_code_block(node.catch)}'
+    try_str = f'try {generate_js_code_block(node.body)}'
+    catch_str = f' catch (e) {generate_js_code_block(node.catch)}'
     finally_str = ''
     if node.finalbody:
-        finally_str = f' finally {generate_code_block(node.finalbody)}'
+        finally_str = f' finally {generate_js_code_block(node.finalbody)}'
     return try_str + catch_str + finally_str
 
 
@@ -160,6 +160,10 @@ def generate_js_delete(node: js_ast.JSDelete) -> str:
     return f'delete {generate_js_expression(node.target)};'
 
 
+def generate_js_let(node: js_ast.JSLet) -> str:
+    return f'let {generate_js_assign(node.assign)}'
+
+
 STATEMENT_GENERATOR_FUNCTIONS = {
     js_ast.JSAssign: generate_js_assign,
     js_ast.JSCodeExpression: generate_js_code_expression,
@@ -172,6 +176,7 @@ STATEMENT_GENERATOR_FUNCTIONS = {
     js_ast.JSContinue: generate_js_continue,
     js_ast.JSBreak: generate_js_break,
     js_ast.JSDelete: generate_js_delete,
+    js_ast.JSLet: generate_js_let,
 }
 
 
@@ -226,7 +231,7 @@ def generate_js_module(node: js_ast.JSModule) -> str:
     result = ''
     if node.export:
         result = generate_js_export(node.export) + '\n\n'
-    return result + generate_js_body(node.body)
+    return result + generate_js_body(node.body.code_block)
 
 
 def generate_js_export(node: js_ast.JSExport) -> str:
