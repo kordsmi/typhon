@@ -160,6 +160,10 @@ def generate_js_delete(node: js_ast.JSDelete) -> str:
     return f'delete {generate_js_expression(node.target)};'
 
 
+def generate_js_let(node: js_ast.JSLet) -> str:
+    return f'let {generate_js_assign(node.assign)}'
+
+
 STATEMENT_GENERATOR_FUNCTIONS = {
     js_ast.JSAssign: generate_js_assign,
     js_ast.JSCodeExpression: generate_js_code_expression,
@@ -172,6 +176,7 @@ STATEMENT_GENERATOR_FUNCTIONS = {
     js_ast.JSContinue: generate_js_continue,
     js_ast.JSBreak: generate_js_break,
     js_ast.JSDelete: generate_js_delete,
+    js_ast.JSLet: generate_js_let,
 }
 
 

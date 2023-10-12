@@ -414,3 +414,15 @@ def test_generate_js_module_with_export():
     result = generate_js_module(js_node)
 
     assert result == 'export {a};\n\na;'
+
+
+def test_generate_js_statement__let():
+    js_node = js_ast.JSLet(assign=js_ast.JSAssign(
+        target=js_ast.JSName(id='v'),
+        value=js_ast.JSConstant(value=2)
+    ))
+    js_str = 'let v = 2;'
+
+    result = generate_js_statement(js_node)
+
+    assert result == js_str

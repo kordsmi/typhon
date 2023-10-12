@@ -297,3 +297,12 @@ class JSModule(JSNode):
 
     def __init__(self, body: [JSStatement], export: Optional[JSExport] = None):
         super().__init__(body=body, export=export)
+
+
+class JSLet(JSNode):
+    _fields = (
+        'assign',
+    )
+
+    def __init__(self, assign: JSAssign):
+        super().__init__(assign=assign)

@@ -4,7 +4,7 @@ from typing import Optional, List
 from typhon import js_ast
 from typhon.exceptions import InvalidNode
 from typhon.generator import generate_js_module
-from typhon.js_analyzer import get_module_info
+from typhon.js_analyzer import transform_module
 
 
 class Transpiler:
@@ -25,8 +25,7 @@ class Transpiler:
         self.js_tree = transpile_module(self.py_tree)
 
     def generate_js(self):
-        info = get_module_info(self.js_tree)
-        self.js_tree.export = js_ast.JSExport(info)
+        transform_module(self.js_tree)
         return generate_js_module(self.js_tree)
 
 
