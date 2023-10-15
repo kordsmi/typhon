@@ -109,6 +109,11 @@ def generate_js_function_def(node: js_ast.JSFunctionDef) -> str:
     return f'function {node.name}({generate_js_arguments(node.args)}) {code_block}'
 
 
+def generate_js_method_def(node: js_ast.JSFunctionDef) -> str:
+    code_block = generate_code_block(node.body)
+    return f'{node.name}({generate_js_arguments(node.args)}) {code_block}'
+
+
 def generate_js_while(node: js_ast.JSWhile) -> str:
     test_str = generate_js_expression(node.test)
     while_body = generate_code_block(node.body)
@@ -195,6 +200,7 @@ STATEMENT_GENERATOR_FUNCTIONS = {
     js_ast.JSCodeExpression: generate_js_code_expression,
     js_ast.JSReturn: generate_js_return,
     js_ast.JSFunctionDef: generate_js_function_def,
+    js_ast.JSMethodDef: generate_js_method_def,
     js_ast.JSWhile: generate_js_while,
     js_ast.JSIf: generate_js_if,
     js_ast.JSThrow: generate_js_throw,

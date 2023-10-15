@@ -1,7 +1,7 @@
 import copy
 
 from typhon import js_ast
-from typhon.js_analyzer import transform_module
+from typhon.js_analyzer import transform_module, transform_body, transform_function_to_method
 
 
 def test_transform_module():
@@ -44,3 +44,34 @@ def test_transform_module__export_imports__all():
     js_module = js_ast.JSModule(body=[js_ast.JSImport('test', names=[])])
     transform_module(js_module)
     assert js_module.export == js_ast.JSExport(['test'])
+
+
+def test_transform_body__transform_class_method():
+    class_body = [js_ast.JSFunctionDef(name='foo', args=js_ast.JSArguments(args=[js_ast.JSArg(arg='self')]), body=[])]
+    js_node = js_ast.JSClassDef(name='A', body=class_body)
+
+    transform_body([js_node])
+
+    expected_body = [js_ast.JSMethodDef(name='foo', args=js_ast.JSArguments(args=[]), body=[])]
+    assert js_node == js_ast.JSClassDef(name='A', body=expected_body)
+
+
+def test_transform_class_method__replase_self_to_this():
+    func_body = [js_ast.JSAssign(
+        js_ast.JSAttribute(js_ast.JSName('self'), 'a'),
+        js_ast.JSAttribute(js_ast.JSName('self'), 'b'),
+    )]
+    func_def = js_ast.JSFunctionDef(
+        name='foo',
+        args=js_ast.JSArguments(args=[js_ast.JSArg(arg='self')]),
+        body=func_body
+    )
+
+    result = transform_function_to_method(func_def)
+
+    method_body = [js_ast.JSAssign(
+        js_ast.JSAttribute(js_ast.JSName('this'), 'a'),
+        js_ast.JSAttribute(js_ast.JSName('this'), 'b'),
+    )]
+    method_def = js_ast.JSMethodDef(name='foo', args=js_ast.JSArguments(args=[]), body=method_body)
+    assert result == method_def

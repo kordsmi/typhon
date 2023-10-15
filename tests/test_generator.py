@@ -50,6 +50,21 @@ def test_generate_statement__function_def():
     assert result == expected
 
 
+def test_generate_statement__method_def():
+    js_node = js_ast.JSMethodDef(
+        'bar',
+        js_ast.JSArguments([js_ast.JSArg('foo')]),
+        [js_ast.JSReturn(js_ast.JSConstant(5))],
+    )
+
+    result = generate_js_statement(js_node)
+
+    expected = '''bar(foo) {
+    return 5;
+}'''
+    assert result == expected
+
+
 def test_generate_js_statement__while():
     node = js_ast.JSWhile(test=js_ast.JSConstant(value=True), body=[])
     result = generate_js_statement(node)

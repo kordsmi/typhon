@@ -14,7 +14,6 @@ class JSNode:
 
         for field_name in self._fields:
             if getattr(self, field_name) != getattr(other, field_name):
-                print(f'Compare error on {self.__class__.__name__}.{field_name}: {getattr(self, field_name)} != {getattr(other, field_name)}')
                 return False
 
         return True
@@ -347,3 +346,7 @@ class JSClassDef(JSStatement):
 
     def __init__(self, name: str, body: [JSStatement]):
         super().__init__(name=name, body=body)
+
+
+class JSMethodDef(JSFunctionDef):
+    pass
