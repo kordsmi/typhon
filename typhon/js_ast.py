@@ -306,3 +306,24 @@ class JSLet(JSNode):
 
     def __init__(self, assign: JSAssign):
         super().__init__(assign=assign)
+
+
+class JSAlias(JSNode):
+    _fields = (
+        'name',
+        'asname',
+    )
+
+    def __init__(self, name: str, asname: str = None):
+        super().__init__(name=name, asname=asname)
+
+
+class JSImport(JSStatement):
+    _fields = (
+        'module',
+        'names',
+        'alias',
+    )
+
+    def __init__(self, module: str, names: [JSAlias] = None, alias: str = None):
+        super().__init__(module=module, names=names, alias=alias)

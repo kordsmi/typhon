@@ -191,6 +191,20 @@ def transpile_del(node: ast.Delete) -> js_ast.JSStatements:
     return js_ast.JSStatements(statements=statements)
 
 
+def transpile_alias(node: ast.alias) -> js_ast.JSAlias:
+    return js_ast.JSAlias(name=node.name, asname=node.asname)
+
+
+def transpile_import_from(node: ast.ImportFrom) -> js_ast.JSImport:
+    import_names = [transpile_alias(alias) for alias in node.names]
+    return js_ast.JSImport(module=node.module, names=import_names)
+
+
+def transpile_import(node: ast.Import) -> js_ast.JSImport:
+    name = node.names[0]
+    return js_ast.JSImport(module=name.name, names=[], alias=name.asname)
+
+
 STATEMENT_TRANSPILER_FUNCTIONS = {
     ast.Assign: transpile_assign,
     ast.Expr: transpile_code_expression,
@@ -203,6 +217,8 @@ STATEMENT_TRANSPILER_FUNCTIONS = {
     ast.Continue: transpile_continue,
     ast.Break: transpile_break,
     ast.Delete: transpile_del,
+    ast.ImportFrom: transpile_import_from,
+    ast.Import: transpile_import,
 }
 
 

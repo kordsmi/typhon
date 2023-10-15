@@ -456,6 +456,24 @@ def test_transpile_statement__break():
     assert js_node == js_ast.JSBreak()
 
 
+def test_transpile_statement__import_from():
+    node = ast.ImportFrom(module='test', names=[ast.alias(name='a', asname='var_a'), ast.alias(name='foo')])
+    js_node = transpile_statement(node)
+    assert js_node == js_ast.JSImport('test', names=[js_ast.JSAlias('a', 'var_a'), js_ast.JSAlias('foo')])
+
+
+def test_transpile_statement__import():
+    node = ast.Import(names=[ast.alias(name='test')])
+    js_node = transpile_statement(node)
+    assert js_node == js_ast.JSImport('test', names=[])
+
+
+def test_transpile_statement__import_as():
+    node = ast.Import(names=[ast.alias(name='test2', asname='bar')])
+    js_node = transpile_statement(node)
+    assert js_node == js_ast.JSImport('test2', names=[], alias='bar')
+
+
 def test_transpile_constant__true():
     node = ast.Constant(value=True)
     js_node = transpile_constant(node)

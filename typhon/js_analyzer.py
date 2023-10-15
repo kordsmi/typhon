@@ -19,6 +19,12 @@ def get_identifies_from_code_block(body: [js_ast.JSStatement]):
             add_name(node.target.id)
         elif isinstance(node, js_ast.JSFunctionDef):
             add_name(node.name)
+        elif isinstance(node, js_ast.JSImport):
+            if node.names:
+                for alias in node.names:
+                    info.append(alias.asname or alias.name)
+            else:
+                info.append(node.alias or node.module)
 
     return info
 

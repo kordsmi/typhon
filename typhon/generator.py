@@ -164,6 +164,23 @@ def generate_js_let(node: js_ast.JSLet) -> str:
     return f'let {generate_js_assign(node.assign)}'
 
 
+def generate_alias(node: js_ast.JSAlias) -> str:
+    if not node.asname:
+        return node.name
+
+    return f'{node.name} as {node.asname}'
+
+
+def generate_js_import(node: js_ast.JSImport) -> str:
+    if node.names:
+        import_names = [generate_alias(alias) for alias in node.names]
+        import_names_str = '{' + ', '.join(import_names) + '}'
+    else:
+        asname = node.alias or node.module
+        import_names_str = f'* as {asname}'
+    return f"import {import_names_str} from './{node.module}.js';"
+
+
 STATEMENT_GENERATOR_FUNCTIONS = {
     js_ast.JSAssign: generate_js_assign,
     js_ast.JSCodeExpression: generate_js_code_expression,
@@ -177,6 +194,7 @@ STATEMENT_GENERATOR_FUNCTIONS = {
     js_ast.JSBreak: generate_js_break,
     js_ast.JSDelete: generate_js_delete,
     js_ast.JSLet: generate_js_let,
+    js_ast.JSImport: generate_js_import,
 }
 
 

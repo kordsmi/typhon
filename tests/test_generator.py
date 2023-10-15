@@ -421,8 +421,25 @@ def test_generate_js_statement__let():
         target=js_ast.JSName(id='v'),
         value=js_ast.JSConstant(value=2)
     ))
-    js_str = 'let v = 2;'
 
     result = generate_js_statement(js_node)
 
-    assert result == js_str
+    assert result == 'let v = 2;'
+
+
+def test_generate_js_statement__import():
+    js_node = js_ast.JSImport('test', names=[js_ast.JSAlias('a', 'var_a'), js_ast.JSAlias('foo')])
+    result = generate_js_statement(js_node)
+    assert result == "import {a as var_a, foo} from './test.js';"
+
+
+def test_generate_js_statement__import_all():
+    js_node = js_ast.JSImport('test', names=[])
+    result = generate_js_statement(js_node)
+    assert result == "import * as test from './test.js';"
+
+
+def test_generate_js_statement__import_all_as():
+    js_node = js_ast.JSImport('test2', names=[], alias='bar')
+    result = generate_js_statement(js_node)
+    assert result == "import * as bar from './test2.js';"
