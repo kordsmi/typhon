@@ -95,6 +95,10 @@ def transpile_subscript(node: ast.Subscript) -> js_ast.JSSubscript:
     return js_ast.JSSubscript(value=transpile_expression(node.value), slice=transpile_expression(node.slice))
 
 
+def transpile_attribute(node: ast.Attribute) -> js_ast.JSAttribute:
+    return js_ast.JSAttribute(value=transpile_name(node.value), attr=node.attr)
+
+
 EXPRESSION_TRANSPILER_FUNCTIONS = {
     ast.Name: transpile_name,
     ast.Constant: transpile_constant,
@@ -107,6 +111,7 @@ EXPRESSION_TRANSPILER_FUNCTIONS = {
     ast.Dict: transpile_dict,
     ast.Compare: transpile_compare,
     ast.Subscript: transpile_subscript,
+    ast.Attribute: transpile_attribute,
 }
 
 
@@ -205,6 +210,10 @@ def transpile_import(node: ast.Import) -> js_ast.JSImport:
     return js_ast.JSImport(module=name.name, names=[], alias=name.asname)
 
 
+def transpile_class_def(node: ast.ClassDef) -> js_ast.JSClassDef:
+    return js_ast.JSClassDef(name=node.name, body=transpile_body(node.body))
+
+
 STATEMENT_TRANSPILER_FUNCTIONS = {
     ast.Assign: transpile_assign,
     ast.Expr: transpile_code_expression,
@@ -219,6 +228,7 @@ STATEMENT_TRANSPILER_FUNCTIONS = {
     ast.Delete: transpile_del,
     ast.ImportFrom: transpile_import_from,
     ast.Import: transpile_import,
+    ast.ClassDef: transpile_class_def,
 }
 
 

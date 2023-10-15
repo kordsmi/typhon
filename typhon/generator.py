@@ -67,6 +67,10 @@ def generate_js_subscript(node: js_ast.JSSubscript) -> str:
     return f'{generate_js_expression(node.value)}[{generate_js_expression(node.slice)}]'
 
 
+def generate_js_attribute(node: js_ast.JSAttribute) -> str:
+    return f'{generate_js_name(node.value)}.{node.attr}'
+
+
 EXPRESSION_GENERATOR_FUNCTIONS = {
     js_ast.JSBinOp: generate_js_bin_op,
     js_ast.JSCall: generate_js_call,
@@ -76,6 +80,7 @@ EXPRESSION_GENERATOR_FUNCTIONS = {
     js_ast.JSDict: generate_js_dict,
     js_ast.JSCompare: generate_js_compare,
     js_ast.JSSubscript: generate_js_subscript,
+    js_ast.JSAttribute: generate_js_attribute,
 }
 
 
@@ -181,6 +186,10 @@ def generate_js_import(node: js_ast.JSImport) -> str:
     return f"import {import_names_str} from './{node.module}.js';"
 
 
+def generate_js_class_def(node: js_ast.JSClassDef) -> str:
+    return f'class {node.name} {generate_code_block(node.body)}'
+
+
 STATEMENT_GENERATOR_FUNCTIONS = {
     js_ast.JSAssign: generate_js_assign,
     js_ast.JSCodeExpression: generate_js_code_expression,
@@ -195,6 +204,7 @@ STATEMENT_GENERATOR_FUNCTIONS = {
     js_ast.JSDelete: generate_js_delete,
     js_ast.JSLet: generate_js_let,
     js_ast.JSImport: generate_js_import,
+    js_ast.JSClassDef: generate_js_class_def,
 }
 
 

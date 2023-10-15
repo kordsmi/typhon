@@ -327,3 +327,23 @@ class JSImport(JSStatement):
 
     def __init__(self, module: str, names: [JSAlias] = None, alias: str = None):
         super().__init__(module=module, names=names, alias=alias)
+
+
+class JSAttribute(JSExpression):
+    _fields = (
+        'value',
+        'attr',
+    )
+
+    def __init__(self, value: JSName, attr: str):
+        super().__init__(value=value, attr=attr)
+
+
+class JSClassDef(JSStatement):
+    _fields = (
+        'name',
+        'body',
+    )
+
+    def __init__(self, name: str, body: [JSStatement]):
+        super().__init__(name=name, body=body)

@@ -242,6 +242,12 @@ def test_transpile_expression__subscript():
     assert js_node == js_ast.JSSubscript(js_ast.JSName('a'), js_ast.JSConstant('c'))
 
 
+def test_transpile_expression_attribute():
+    node = ast.Attribute(value=ast.Name(id='foo'), attr='bar')
+    js_node = transpile_expression(node)
+    assert js_node == js_ast.JSAttribute(js_ast.JSName('foo'), 'bar')
+
+
 def test_transpile_arg():
     node = ast.arg(arg='a')
 
@@ -472,6 +478,12 @@ def test_transpile_statement__import_as():
     node = ast.Import(names=[ast.alias(name='test2', asname='bar')])
     js_node = transpile_statement(node)
     assert js_node == js_ast.JSImport('test2', names=[], alias='bar')
+
+
+def test_transpile_statement__class_def():
+    node = ast.ClassDef(name='A', body=[])
+    js_node = transpile_statement(node)
+    assert js_node == js_ast.JSClassDef(name='A', body=[])
 
 
 def test_transpile_constant__true():

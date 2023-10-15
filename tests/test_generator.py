@@ -231,6 +231,12 @@ def test_generate_js_expression__subscript():
     assert result == "a['c']"
 
 
+def test_generate_js_expression__attribute():
+    js_node = js_ast.JSAttribute(js_ast.JSName('foo'), 'bar')
+    result = generate_js_expression(js_node)
+    assert result == 'foo.bar'
+
+
 def test_generate_js_bin_op():
     js_node = js_ast.JSBinOp(
         left=js_ast.JSBinOp(
@@ -443,3 +449,9 @@ def test_generate_js_statement__import_all_as():
     js_node = js_ast.JSImport('test2', names=[], alias='bar')
     result = generate_js_statement(js_node)
     assert result == "import * as bar from './test2.js';"
+
+
+def test_generate_js_statement__class_def():
+    js_node = js_ast.JSClassDef(name='A', body=[])
+    result = generate_js_statement(js_node)
+    assert result == "class A {\n}"
