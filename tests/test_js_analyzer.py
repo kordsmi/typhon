@@ -46,6 +46,12 @@ def test_transform_module__export_imports__all():
     assert js_module.export == js_ast.JSExport(['test'])
 
 
+def test_transform_module__export_class_names():
+    js_module = js_ast.JSModule(body=[js_ast.JSClassDef(name='TestClass', body=[])])
+    transform_module(js_module)
+    assert js_module.export == js_ast.JSExport(['TestClass'])
+
+
 def test_transform_body__transform_class_method():
     class_body = [js_ast.JSFunctionDef(name='foo', args=js_ast.JSArguments(args=[js_ast.JSArg(arg='self')]), body=[])]
     js_node = js_ast.JSClassDef(name='A', body=class_body)

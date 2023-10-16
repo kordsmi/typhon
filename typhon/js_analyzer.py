@@ -7,7 +7,7 @@ def transform_module(js_module: js_ast.JSModule):
     transform_body(js_module.body)
 
 
-def get_identifies_from_code_block(body: [js_ast.JSStatement]):
+def get_identifies_from_code_block(body: [js_ast.JSStatement]) -> [str]:
     info = []
 
     def add_name(name: str):
@@ -25,6 +25,8 @@ def get_identifies_from_code_block(body: [js_ast.JSStatement]):
                     info.append(alias.asname or alias.name)
             else:
                 info.append(node.alias or node.module)
+        elif isinstance(node, js_ast.JSClassDef):
+            info.append(node.name)
 
     return info
 
