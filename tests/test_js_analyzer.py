@@ -1,7 +1,7 @@
 import copy
 
 from typhon import js_ast
-from typhon.js_analyzer import transform_module, transform_body, transform_function_to_method
+from typhon.js_analyzer import transform_module, transform_body, transform_function_to_method, replace_in_body
 
 
 def test_transform_module():
@@ -56,7 +56,7 @@ def test_transform_body__transform_class_method():
     assert js_node == js_ast.JSClassDef(name='A', body=expected_body)
 
 
-def test_transform_class_method__replase_self_to_this():
+def test_transform_function_to_method__replace_self_to_this():
     func_body = [js_ast.JSAssign(
         js_ast.JSAttribute(js_ast.JSName('self'), 'a'),
         js_ast.JSAttribute(js_ast.JSName('self'), 'b'),
@@ -75,3 +75,38 @@ def test_transform_class_method__replase_self_to_this():
     )]
     method_def = js_ast.JSMethodDef(name='foo', args=js_ast.JSArguments(args=[]), body=method_body)
     assert result == method_def
+
+
+def test_transform_function_to_method__constructor():
+    func_def = js_ast.JSFunctionDef(name='__init__', args=js_ast.JSArguments(), body=[])
+    result = transform_function_to_method(func_def)
+    assert result == js_ast.JSMethodDef(name='constructor', args=js_ast.JSArguments(), body=[])
+
+
+def test_replace_in_body__replace_call_args():
+    body = [
+        js_ast.JSCodeExpression(js_ast.JSCall(
+            func='a',
+            args=[js_ast.JSName(id='a'), js_ast.JSName(id='b')],
+            keywords=[
+                js_ast.JSKeyWord(arg='c', value=js_ast.JSName('b')),
+                js_ast.JSKeyWord(arg='b', value=js_ast.JSName('d')),
+            ]
+        ))
+    ]
+
+    result = replace_in_body(body, js_ast.JSName('b'), js_ast.JSName('foo'))
+
+    expected = [
+        js_ast.JSCodeExpression(js_ast.JSCall(
+            func='a',
+            args=[js_ast.JSName(id='a'), js_ast.JSName(id='foo')],
+            keywords=[
+                js_ast.JSKeyWord(arg='c', value=js_ast.JSName('foo')),
+                js_ast.JSKeyWord(arg='b', value=js_ast.JSName('d')),
+            ]
+        ))
+    ]
+    assert result == expected
+
+
