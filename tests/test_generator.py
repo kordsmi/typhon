@@ -193,7 +193,7 @@ def test_generate_js_expression__constant(value, result):
 
 def test_generate_js_expression__call():
     js_node = js_ast.JSCall(
-        func='console.log',
+        func=js_ast.JSName('console.log'),
         args=[js_ast.JSBinOp(left=js_ast.JSConstant(value=1), op=js_ast.JSAdd(), right=js_ast.JSConstant(value=2))]
     )
     js_str = 'console.log(1 + 2)'
@@ -252,6 +252,18 @@ def test_generate_js_expression__attribute():
     assert result == 'foo.bar'
 
 
+def test_generate_js_expression__new():
+    js_node = js_ast.JSNew(
+        class_=js_ast.JSName('Foo'),
+        args=[js_ast.JSBinOp(left=js_ast.JSConstant(value=1), op=js_ast.JSAdd(), right=js_ast.JSConstant(value=2))]
+    )
+
+    result = generate_js_expression(js_node)
+
+    expected = 'new Foo(1 + 2)'
+    assert result == expected
+
+
 def test_generate_js_bin_op():
     js_node = js_ast.JSBinOp(
         left=js_ast.JSBinOp(
@@ -270,7 +282,7 @@ def test_generate_js_bin_op():
 
 def test_generate_js_call():
     js_node = js_ast.JSCall(
-        func='test',
+        func=js_ast.JSName('test'),
         args=[
             js_ast.JSBinOp(left=js_ast.JSConstant(value=1), op=js_ast.JSAdd(), right=js_ast.JSConstant(value=2))
         ],

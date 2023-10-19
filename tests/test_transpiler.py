@@ -29,7 +29,7 @@ print('a + 2 = ', a + 2)'''
 
         expected = js_ast.JSModule(body=[
             js_ast.JSAssign(target=js_ast.JSName(id='a'), value=js_ast.JSConstant(value=1)),
-            js_ast.JSCodeExpression(js_ast.JSCall(func='console.log', args=[
+            js_ast.JSCodeExpression(js_ast.JSCall(func=js_ast.JSName('console.log'), args=[
                 js_ast.JSConstant(value='a + 2 = '),
                 js_ast.JSBinOp(left=js_ast.JSName(id='a'), op=js_ast.JSAdd(), right=js_ast.JSConstant(value=2)),
             ]))
@@ -114,7 +114,16 @@ def test_transpile_call():
     result = transpile_call(call_node)
 
     assert isinstance(result,  js_ast.JSCall)
-    assert result.func == 'test'
+    assert result.func.id == 'test'
+
+
+def test_transpile_call__method():
+    call_node = ast.Call(func=ast.Attribute(value=ast.Name(id='test', ctx=ast.Load()), attr='method'))
+
+    result = transpile_call(call_node)
+
+    expected = js_ast.JSCall(func=js_ast.JSAttribute(js_ast.JSName('test'), attr='method'))
+    assert result == expected
 
 
 def test_transpile_call__with_args():
@@ -122,7 +131,7 @@ def test_transpile_call__with_args():
 
     result = transpile_call(call_node)
 
-    expected = js_ast.JSCall(func='test', args=[js_ast.JSConstant(value=1), js_ast.JSName(id='a')])
+    expected = js_ast.JSCall(func=js_ast.JSName('test'), args=[js_ast.JSConstant(value=1), js_ast.JSName(id='a')])
     assert result == expected
 
 
@@ -139,7 +148,7 @@ def test_transpile_call__with_keywords():
     result = transpile_call(call_node)
 
     expected = js_ast.JSCall(
-        func='test',
+        func=js_ast.JSName('test'),
         keywords=[
             js_ast.JSKeyWord(arg='a', value=js_ast.JSConstant(value=1)),
             js_ast.JSKeyWord(arg='b', value=js_ast.JSConstant(value=2))
@@ -153,7 +162,7 @@ def test_transpile_call__print():
 
     result = transpile_call(call_node)
 
-    expected = js_ast.JSCall(func='console.log', args=[js_ast.JSConstant(value='Hello!')])
+    expected = js_ast.JSCall(func=js_ast.JSName('console.log'), args=[js_ast.JSConstant(value='Hello!')])
     assert result == expected
 
 
@@ -166,7 +175,7 @@ def test_transpile_call__with_expression():
     result = transpile_call(call_node)
 
     expected = js_ast.JSCall(
-        func='test',
+        func=js_ast.JSName('test'),
         args=[
             js_ast.JSBinOp(
                 left=js_ast.JSConstant(value=1),

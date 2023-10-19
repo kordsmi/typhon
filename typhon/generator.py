@@ -19,7 +19,7 @@ def generate_js_call(node: js_ast.JSCall) -> str:
     args_str = generate_expression_list(node.args)
     args_str += [generate_js_keyword(keyword) for keyword in node.keywords]
 
-    return f'{node.func}({", ".join(args_str)})'
+    return f'{generate_js_expression(node.func)}({", ".join(args_str)})'
 
 
 def generate_js_name(node: js_ast.JSName):
@@ -71,6 +71,13 @@ def generate_js_attribute(node: js_ast.JSAttribute) -> str:
     return f'{generate_js_name(node.value)}.{node.attr}'
 
 
+def generate_js_new(node: js_ast.JSNew) -> str:
+    args_str = generate_expression_list(node.args)
+    args_str += [generate_js_keyword(keyword) for keyword in node.keywords]
+
+    return f'new {generate_js_expression(node.class_)}({", ".join(args_str)})'
+
+
 EXPRESSION_GENERATOR_FUNCTIONS = {
     js_ast.JSBinOp: generate_js_bin_op,
     js_ast.JSCall: generate_js_call,
@@ -81,6 +88,7 @@ EXPRESSION_GENERATOR_FUNCTIONS = {
     js_ast.JSCompare: generate_js_compare,
     js_ast.JSSubscript: generate_js_subscript,
     js_ast.JSAttribute: generate_js_attribute,
+    js_ast.JSNew: generate_js_new,
 }
 
 

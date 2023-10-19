@@ -62,6 +62,21 @@ def test_transform_body__transform_class_method():
     assert js_node == js_ast.JSClassDef(name='A', body=expected_body)
 
 
+def test_transform_body__transform_call_to_new():
+    js_body = [
+        js_ast.JSClassDef(name='TestClass', body=[]),
+        js_ast.JSCall(func='TestClass'),
+    ]
+
+    transform_body(js_body)
+
+    expected = [
+        js_ast.JSClassDef(name='TestClass', body=[]),
+        js_ast.JSNew(class_=js_ast.JSName('TestClass')),
+    ]
+    assert js_body == expected
+
+
 def test_transform_function_to_method__replace_self_to_this():
     func_body = [js_ast.JSAssign(
         js_ast.JSAttribute(js_ast.JSName('self'), 'a'),

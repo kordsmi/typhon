@@ -84,7 +84,7 @@ class JSCall(JSExpression):
         'keywords',
     )
 
-    def __init__(self, func: str, args: [JSExpression] = None, keywords: [JSKeyWord] = None):
+    def __init__(self, func: JSExpression, args: [JSExpression] = None, keywords: [JSKeyWord] = None):
         super().__init__(func=func, args=args, keywords=keywords or [])
 
 
@@ -350,3 +350,14 @@ class JSClassDef(JSStatement):
 
 class JSMethodDef(JSFunctionDef):
     pass
+
+
+class JSNew(JSExpression):
+    _fields = (
+        'class_',
+        'args',
+        'keywords',
+    )
+
+    def __init__(self, class_: JSExpression, args: [JSExpression] = None, keywords: [JSKeyWord] = None):
+        super().__init__(class_=class_, args=args, keywords=keywords or [])

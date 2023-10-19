@@ -32,17 +32,21 @@ def get_identifies_from_code_block(body: [js_ast.JSStatement]) -> [str]:
 
 
 def transform_body(body: [js_ast.JSStatement]):
-    names = []
+    names = {}
 
     for i in range(len(body)):
         node = body[i]
         if isinstance(node, js_ast.JSAssign) and isinstance(node.target, js_ast.JSName):
             name = node.target.id
             if name not in names:
-                names.append(name)
+                names[name] = type(node)
                 body[i] = js_ast.JSLet(node)
         elif isinstance(node, js_ast.JSClassDef):
             transform_class(node)
+            names[node.name] = js_ast.JSClassDef
+        elif isinstance(node, js_ast.JSCall):
+            if names.get(node.func) == js_ast.JSClassDef:
+                body[i] = transform_call_to_new(node)
 
 
 def transform_class(class_def: js_ast.JSClassDef):
@@ -71,6 +75,10 @@ def transform_method_args(method_def: js_ast.JSMethodDef):
         if arg.arg == 'self':
             method_def.args.args.remove(arg)
             break
+
+
+def transform_call_to_new(node: js_ast.JSCall) -> js_ast.JSNew:
+    return js_ast.JSNew(class_=js_ast.JSName(node.func), args=node.args, keywords=node.keywords)
 
 
 def replace_in_body(body: [js_ast.JSStatement], find: js_ast.JSNode, replace: js_ast.JSNode) -> [js_ast.JSStatement]:
