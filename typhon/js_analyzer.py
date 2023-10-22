@@ -1,52 +1,91 @@
+from collections import defaultdict
+from dataclasses import dataclass
+
 from typhon import js_ast
 
 
 def transform_module(js_module: js_ast.JSModule):
-    info = get_identifies_from_code_block(js_module.body)
+    body_transformer = BodyTransformer(js_module.body)
+    body_transformer.transform()
+    info = body_transformer.get_identifies()
     js_module.export = js_ast.JSExport(info)
-    transform_body(js_module.body)
 
 
-def get_identifies_from_code_block(body: [js_ast.JSStatement]) -> [str]:
-    info = []
-
-    def add_name(name: str):
-        if name not in info:
-            info.append(name)
-
-    for node in body:
-        if isinstance(node, js_ast.JSAssign) and isinstance(node.target, js_ast.JSName):
-            add_name(node.target.id)
-        elif isinstance(node, js_ast.JSFunctionDef):
-            add_name(node.name)
-        elif isinstance(node, js_ast.JSImport):
-            if node.names:
-                for alias in node.names:
-                    info.append(alias.asname or alias.name)
-            else:
-                info.append(node.alias or node.module)
-        elif isinstance(node, js_ast.JSClassDef):
-            info.append(node.name)
-
-    return info
+@dataclass
+class NodeInfo:
+    node: js_ast.JSNode
+    index: int
 
 
-def transform_body(body: [js_ast.JSStatement]):
-    names = {}
+class BodyTransformer:
+    def __init__(self, body: [js_ast.JSStatement]):
+        self.body = body
+        self.var_list = defaultdict(list)
+        self.class_def_list = defaultdict(list)
+        self.func_def_list = defaultdict(list)
+        self.import_list = defaultdict(list)
+        self.call_list = defaultdict(list)
 
-    for i in range(len(body)):
-        node = body[i]
-        if isinstance(node, js_ast.JSAssign) and isinstance(node.target, js_ast.JSName):
-            name = node.target.id
-            if name not in names:
-                names[name] = type(node)
-                body[i] = js_ast.JSLet(node)
-        elif isinstance(node, js_ast.JSClassDef):
-            transform_class(node)
-            names[node.name] = js_ast.JSClassDef
-        elif isinstance(node, js_ast.JSCall):
-            if names.get(node.func) == js_ast.JSClassDef:
-                body[i] = transform_call_to_new(node)
+    def collect_objects_info(self):
+        for i in range(len(self.body)):
+            node = self.body[i]
+            if isinstance(node, js_ast.JSAssign) and isinstance(node.target, js_ast.JSName):
+                self.var_list[node.target.id].append(NodeInfo(node, i))
+            elif isinstance(node, js_ast.JSFunctionDef):
+                self.func_def_list[node.name].append(NodeInfo(node, i))
+            elif isinstance(node, js_ast.JSImport):
+                if node.names:
+                    for alias in node.names:
+                        object_name = alias.asname or alias.name
+                        self.import_list[object_name].append(NodeInfo(node, i))
+                else:
+                    object_name = node.alias or node.module
+                    self.import_list[object_name].append(NodeInfo(node, i))
+            elif isinstance(node, js_ast.JSClassDef):
+                self.class_def_list[node.name].append(NodeInfo(node, i))
+            elif isinstance(node, js_ast.JSCall):
+                self.call_list[node.func].append(NodeInfo(node, i))
+
+    def get_identifies(self):
+        info = []
+
+        def add_name(name: str):
+            if name not in info:
+                info.append(name)
+
+        def add_names(info_dict: {}):
+            for item in info_dict.keys():
+                add_name(item)
+
+        add_names(self.var_list)
+        add_names(self.func_def_list)
+        add_names(self.class_def_list)
+        add_names(self.import_list)
+
+        return info
+
+    def transform(self):
+        self.collect_objects_info()
+        self.insert_let()
+        self.transform_classes()
+        self.transform_calls_to_new()
+
+    def insert_let(self):
+        for var_name, info_list in self.var_list.items():
+            info: NodeInfo = info_list[0]
+            info.node = js_ast.JSLet(info.node)
+            self.body[info.index] = info.node
+
+    def transform_classes(self):
+        for class_name, info_list in self.class_def_list.items():
+            info: NodeInfo = info_list[0]
+            transform_class(info.node)
+
+    def transform_calls_to_new(self):
+        for name, info_list in self.call_list.items():
+            if name in self.class_def_list:
+                for info in info_list:
+                    self.body[info.index] = transform_call_to_new(info.node)
 
 
 def transform_class(class_def: js_ast.JSClassDef):

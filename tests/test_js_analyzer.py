@@ -1,7 +1,7 @@
 import copy
 
 from typhon import js_ast
-from typhon.js_analyzer import transform_module, transform_body, transform_function_to_method, replace_in_body
+from typhon.js_analyzer import transform_module, transform_function_to_method, replace_in_body, BodyTransformer
 
 
 def test_transform_module():
@@ -56,7 +56,8 @@ def test_transform_body__transform_class_method():
     class_body = [js_ast.JSFunctionDef(name='foo', args=js_ast.JSArguments(args=[js_ast.JSArg(arg='self')]), body=[])]
     js_node = js_ast.JSClassDef(name='A', body=class_body)
 
-    transform_body([js_node])
+    body_transformer = BodyTransformer([js_node])
+    body_transformer.transform()
 
     expected_body = [js_ast.JSMethodDef(name='foo', args=js_ast.JSArguments(args=[]), body=[])]
     assert js_node == js_ast.JSClassDef(name='A', body=expected_body)
@@ -68,7 +69,8 @@ def test_transform_body__transform_call_to_new():
         js_ast.JSCall(func='TestClass'),
     ]
 
-    transform_body(js_body)
+    body_transformer = BodyTransformer(js_body)
+    body_transformer.transform()
 
     expected = [
         js_ast.JSClassDef(name='TestClass', body=[]),
@@ -129,5 +131,3 @@ def test_replace_in_body__replace_call_args():
         ))
     ]
     assert result == expected
-
-
