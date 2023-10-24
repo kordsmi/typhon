@@ -261,7 +261,7 @@ def generate_js_arguments(node: js_ast.JSArguments) -> str:
 
 
 def generate_js_body(nodes: [js_ast.JSStatement]) -> str:
-    result = [generate_js_statement(node) for node in nodes]
+    result = [generate_js_statement(node) for node in nodes if not isinstance(node, js_ast.JSNop)]
     return '\n'.join(result)
 
 

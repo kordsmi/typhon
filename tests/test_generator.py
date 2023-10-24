@@ -8,7 +8,7 @@ from typhon.exceptions import UnsupportedNode
 from typhon.generator import generate_js_name, generate_js_constant, generate_js_expression, generate_js_bin_op, \
     generate_js_call, generate_js_code_expression, generate_js_statement, generate_js_arg, generate_js_arguments, \
     generate_js_return, generate_js_eq, generate_code_block, generate_js_dict, generate_expression_list, \
-    generate_js_assign, generate_js_module
+    generate_js_assign, generate_js_module, generate_js_body
 from typhon.transpiler import transpile_arguments
 
 
@@ -482,3 +482,9 @@ def test_generate_js_statement__class_def():
     js_node = js_ast.JSClassDef(name='A', body=[])
     result = generate_js_statement(js_node)
     assert result == "class A {\n}"
+
+
+def test_generate_js_body__nop():
+    js_node = js_ast.JSNop()
+    result = generate_js_body([js_node])
+    assert result == ''

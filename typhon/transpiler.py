@@ -45,18 +45,13 @@ def transpile_keyword(node: ast.keyword) -> js_ast.JSKeyWord:
 
 
 def transpile_call(node: ast.Call) -> js_ast.JSCall:
-    func = node.func
-    if isinstance(func, ast.Name):
-        if func.id == 'print':
-            func = ast.Name(id='console.log')
-
     args = getattr(node, 'args', [])
     js_args = transpile_expression_list(args)
 
     keywords = getattr(node, 'keywords', [])
     js_keywords = [transpile_keyword(keyword) for keyword in keywords]
 
-    return js_ast.JSCall(transpile_expression(func), args=js_args, keywords=js_keywords)
+    return js_ast.JSCall(transpile_expression(node.func), args=js_args, keywords=js_keywords)
 
 
 def transpile_constant(constant: ast.Constant) -> js_ast.JSConstant:

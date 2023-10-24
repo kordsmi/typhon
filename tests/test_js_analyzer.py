@@ -1,7 +1,9 @@
 import copy
 
 from typhon import js_ast
-from typhon.js_analyzer import transform_module, transform_function_to_method, replace_in_body, BodyTransformer
+from typhon.js_analyzer import transform_module, transform_function_to_method, replace_in_body, BodyTransformer, \
+    NodeInfo
+from typhon.transpiler import Transpiler
 
 
 def test_transform_module():
@@ -131,3 +133,41 @@ def test_replace_in_body__replace_call_args():
         ))
     ]
     assert result == expected
+
+
+class TestBodyTransformer:
+    def test_collect_typhon_aliases(self):
+        code = 'a.__ty_alias__ = "b"'
+        transpiler = Transpiler(code)
+        transpiler.parse()
+        transpiler.transpile_src()
+        body_transformer = BodyTransformer(transpiler.js_tree.body)
+
+        body_transformer.collect_objects_info()
+
+        assert list(body_transformer.alias_list.keys()) == ['a']
+        assert body_transformer.alias_list['a'] == [NodeInfo(
+            node=js_ast.JSAssign(js_ast.JSAttribute(js_ast.JSName('a'), '__ty_alias__'), js_ast.JSConstant('b')),
+            index=0
+        )]
+
+    def test_rename_variables_to_aliases(self):
+        code = '''a.__ty_alias__ = 'b'
+a = 123
+a()
+c = a'''
+        transpiler = Transpiler(code)
+        transpiler.parse()
+        transpiler.transpile_src()
+        body_transformer = BodyTransformer(transpiler.js_tree.body)
+        body_transformer.collect_objects_info()
+
+        body_transformer.transform()
+
+        expected = [
+            js_ast.JSNop(),
+            js_ast.JSLet(js_ast.JSAssign(js_ast.JSName('b'), js_ast.JSConstant(123))),
+            js_ast.JSCodeExpression(js_ast.JSCall(js_ast.JSName('b'))),
+            js_ast.JSLet(js_ast.JSAssign(js_ast.JSName('c'), js_ast.JSName('b'))),
+        ]
+        assert body_transformer.body == expected

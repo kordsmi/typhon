@@ -361,3 +361,7 @@ class JSNew(JSExpression):
 
     def __init__(self, class_: JSExpression, args: [JSExpression] = None, keywords: [JSKeyWord] = None):
         super().__init__(class_=class_, args=args, keywords=keywords or [])
+
+
+class JSNop(JSNode):
+    pass

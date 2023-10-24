@@ -25,12 +25,13 @@ class BodyTransformer:
         self.func_def_list = defaultdict(list)
         self.import_list = defaultdict(list)
         self.call_list = defaultdict(list)
+        self.alias_list = defaultdict(list)
 
     def collect_objects_info(self):
         for i in range(len(self.body)):
             node = self.body[i]
-            if isinstance(node, js_ast.JSAssign) and isinstance(node.target, js_ast.JSName):
-                self.var_list[node.target.id].append(NodeInfo(node, i))
+            if isinstance(node, js_ast.JSAssign):
+                self.collect_assign_info(node, i)
             elif isinstance(node, js_ast.JSFunctionDef):
                 self.func_def_list[node.name].append(NodeInfo(node, i))
             elif isinstance(node, js_ast.JSImport):
@@ -45,6 +46,18 @@ class BodyTransformer:
                 self.class_def_list[node.name].append(NodeInfo(node, i))
             elif isinstance(node, js_ast.JSCall):
                 self.call_list[node.func].append(NodeInfo(node, i))
+
+    def collect_assign_info(self, node: js_ast.JSAssign, index: int):
+        target: js_ast.JSExpression = node.target
+        if isinstance(target, js_ast.JSName):
+            self.var_list[target.id].append(NodeInfo(node, index))
+        elif isinstance(target, js_ast.JSAttribute):
+            if not isinstance(target.value, js_ast.JSName):
+                return
+            value_name = target.value.id
+            if target.attr == '__ty_alias__':
+                self.alias_list[value_name].append(NodeInfo(node, index))
+                self.body[index] = js_ast.JSNop()
 
     def get_identifies(self):
         info = []
@@ -66,6 +79,7 @@ class BodyTransformer:
 
     def transform(self):
         self.collect_objects_info()
+        self.replace_variables_to_aliases()
         self.insert_let()
         self.transform_classes()
         self.transform_calls_to_new()
@@ -86,6 +100,14 @@ class BodyTransformer:
             if name in self.class_def_list:
                 for info in info_list:
                     self.body[info.index] = transform_call_to_new(info.node)
+
+    def replace_variables_to_aliases(self):
+        for var_name, node_info_list in self.alias_list.items():
+            find = js_ast.JSName(id=var_name)
+            assign_node: js_ast.JSAssign = node_info_list[0].node
+            value: js_ast.JSConstant = assign_node.value
+            replace = js_ast.JSName(id=value.value)
+            self.body = replace_in_body(self.body, find, replace)
 
 
 def transform_class(class_def: js_ast.JSClassDef):
@@ -164,15 +186,19 @@ def replace_in_attribute(attr: js_ast.JSAttribute, find: js_ast.JSNode, replace:
 
 
 def replace_in_call(node: js_ast.JSCall, find: js_ast.JSNode, replace: js_ast.JSNode) -> js_ast.JSCall:
-    for i in range(len(node.args)):
-        arg = node.args[i]
-        new_arg = replace_in_expression(arg, find, replace)
-        if new_arg != arg:
-            node.args[i] = new_arg
+    node.func = replace_in_expression(node.func, find, replace)
 
-    for keyword in node.keywords:
-        new_value = replace_in_expression(keyword.value, find, replace)
-        if new_value != keyword.value:
-            keyword.value = new_value
+    if node.args:
+        for i in range(len(node.args)):
+            arg = node.args[i]
+            new_arg = replace_in_expression(arg, find, replace)
+            if new_arg != arg:
+                node.args[i] = new_arg
+
+    if node.keywords:
+        for keyword in node.keywords:
+            new_value = replace_in_expression(keyword.value, find, replace)
+            if new_value != keyword.value:
+                keyword.value = new_value
 
     return node
