@@ -11,7 +11,7 @@ from typhon.transpiler import transpile, transpile_bin_op, transpile_call, trans
 
 def test_transpiler():
     py_str = 'print(1 + 2)'
-    js_str = 'export {};\n\nconsole.log(1 + 2);'
+    js_str = 'export {};\n\nprint(1 + 2);'
 
     result = transpile(py_str)
 
@@ -29,7 +29,7 @@ print('a + 2 = ', a + 2)'''
 
         expected = js_ast.JSModule(body=[
             js_ast.JSAssign(target=js_ast.JSName(id='a'), value=js_ast.JSConstant(value=1)),
-            js_ast.JSCodeExpression(js_ast.JSCall(func=js_ast.JSName('console.log'), args=[
+            js_ast.JSCodeExpression(js_ast.JSCall(func=js_ast.JSName('print'), args=[
                 js_ast.JSConstant(value='a + 2 = '),
                 js_ast.JSBinOp(left=js_ast.JSName(id='a'), op=js_ast.JSAdd(), right=js_ast.JSConstant(value=2)),
             ]))
@@ -154,15 +154,6 @@ def test_transpile_call__with_keywords():
             js_ast.JSKeyWord(arg='b', value=js_ast.JSConstant(value=2))
         ]
     )
-    assert result == expected
-
-
-def test_transpile_call__print():
-    call_node = ast.Call(func=ast.Name(id='print', ctx=ast.Load()), args=[ast.Constant(value='Hello!')])
-
-    result = transpile_call(call_node)
-
-    expected = js_ast.JSCall(func=js_ast.JSName('console.log'), args=[js_ast.JSConstant(value='Hello!')])
     assert result == expected
 
 
