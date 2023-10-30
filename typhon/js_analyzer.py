@@ -1,14 +1,18 @@
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import Optional
 
 from typhon import js_ast
+from typhon.js_visitor import JSNodeVisitor
 
 
 def transform_module(js_module: js_ast.JSModule):
     body_transformer = BodyTransformer(js_module.body)
-    body_transformer.transform()
+    new_body = body_transformer.transform()
     info = body_transformer.get_identifies()
-    js_module.export = js_ast.JSExport(info)
+    export = js_ast.JSExport(info)
+
+    return js_ast.JSModule(body=new_body or js_module.body, export=export)
 
 
 @dataclass
@@ -17,7 +21,7 @@ class NodeInfo:
     index: int
 
 
-class BodyTransformer:
+class BodyTransformer(JSNodeVisitor):
     def __init__(self, body: [js_ast.JSStatement]):
         self.body = body
         self.var_list = defaultdict(list)
@@ -26,38 +30,6 @@ class BodyTransformer:
         self.import_list = defaultdict(list)
         self.call_list = defaultdict(list)
         self.alias_list = defaultdict(list)
-
-    def collect_objects_info(self):
-        for i in range(len(self.body)):
-            node = self.body[i]
-            if isinstance(node, js_ast.JSAssign):
-                self.collect_assign_info(node, i)
-            elif isinstance(node, js_ast.JSFunctionDef):
-                self.func_def_list[node.name].append(NodeInfo(node, i))
-            elif isinstance(node, js_ast.JSImport):
-                if node.names:
-                    for alias in node.names:
-                        object_name = alias.asname or alias.name
-                        self.import_list[object_name].append(NodeInfo(node, i))
-                else:
-                    object_name = node.alias or node.module
-                    self.import_list[object_name].append(NodeInfo(node, i))
-            elif isinstance(node, js_ast.JSClassDef):
-                self.class_def_list[node.name].append(NodeInfo(node, i))
-            elif isinstance(node, js_ast.JSCall):
-                self.call_list[node.func].append(NodeInfo(node, i))
-
-    def collect_assign_info(self, node: js_ast.JSAssign, index: int):
-        target: js_ast.JSExpression = node.target
-        if isinstance(target, js_ast.JSName):
-            self.var_list[target.id].append(NodeInfo(node, index))
-        elif isinstance(target, js_ast.JSAttribute):
-            if not isinstance(target.value, js_ast.JSName):
-                return
-            value_name = target.value.id
-            if target.attr == '__ty_alias__':
-                self.alias_list[value_name].append(NodeInfo(node, index))
-                self.body[index] = js_ast.JSNop()
 
     def get_identifies(self):
         info = []
@@ -78,17 +50,14 @@ class BodyTransformer:
         return info
 
     def transform(self):
-        self.collect_objects_info()
-        self.replace_variables_to_aliases()
-        self.insert_let()
+        new_body = self.visit(self.body)
+        if new_body:
+            self.body = new_body
         self.transform_classes()
         self.transform_calls_to_new()
 
-    def insert_let(self):
-        for var_name, info_list in self.var_list.items():
-            info: NodeInfo = info_list[0]
-            info.node = js_ast.JSLet(info.node)
-            self.body[info.index] = info.node
+        if new_body:
+            return new_body
 
     def transform_classes(self):
         for class_name, info_list in self.class_def_list.items():
@@ -101,13 +70,70 @@ class BodyTransformer:
                 for info in info_list:
                     self.body[info.index] = transform_call_to_new(info.node)
 
-    def replace_variables_to_aliases(self):
-        for var_name, node_info_list in self.alias_list.items():
-            find = js_ast.JSName(id=var_name)
-            assign_node: js_ast.JSAssign = node_info_list[0].node
+    def visit_JSAssign(self, node: js_ast.JSAssign) -> Optional[js_ast.JSAssign]:
+        visited_node = super().visit_JSAssign(node)
+        node = visited_node or node
+        target = node.target
+        if isinstance(target, js_ast.JSName):
+            name = target.id
+            if not self.var_list[name]:
+                visited_node = js_ast.JSLet(node)
+            self.var_list[name].append(visited_node)
+        elif isinstance(target, js_ast.JSAttribute):
+            if isinstance(target.value, js_ast.JSName):
+                value_name = target.value.id
+                if target.attr == '__ty_alias__':
+                    self.alias_list[value_name].append(NodeInfo(node, -1))
+                    visited_node = js_ast.JSNop()
+        return visited_node
+
+    def visit_JSName(self, node: js_ast.JSName) -> Optional[js_ast.JSName]:
+        var_name = node.id
+        if self.alias_list[var_name]:
+            alias_info = self.alias_list[var_name][0]
+            assign_node: js_ast.JSAssign = alias_info.node
             value: js_ast.JSConstant = assign_node.value
-            replace = js_ast.JSName(id=value.value)
-            self.body = replace_in_body(self.body, find, replace)
+            return js_ast.JSName(id=value.value)
+
+    def visit_JSCall(self, node: js_ast.JSCall) -> Optional[js_ast.JSCall]:
+        visited_node = super().visit_JSCall(node)
+        self._add_call_info(visited_node or node)
+        return visited_node
+
+    def visit_JSClassDef(self, node: js_ast.JSClassDef) -> Optional['js_ast.JSClassDef']:
+        visited_node = super().visit_JSClassDef(node)
+        self._add_class_def_info(visited_node or node)
+        return visited_node
+
+    def visit_JSImport(self, node: js_ast.JSImport) -> Optional[js_ast.JSImport]:
+        visited_node = super().visit_JSImport(node)
+        self._add_import_info(visited_node or node)
+        return visited_node
+
+    def visit_JSFunctionDef(self, node: js_ast.JSFunctionDef) -> Optional[js_ast.JSFunctionDef]:
+        visited_node = super().visit_JSFunctionDef(node)
+        self._add_func_def_info(visited_node or node)
+        return visited_node
+
+    def _add_call_info(self, node: js_ast.JSCall):
+        func: js_ast.JSExpression = node.func
+        if isinstance(func, js_ast.JSName):
+            self.call_list[func.id].append(NodeInfo(node, -1))
+
+    def _add_class_def_info(self, node: js_ast.JSClassDef):
+        self.class_def_list[node.name].append(NodeInfo(node, -1))
+
+    def _add_import_info(self, node: js_ast.JSImport):
+        if node.names:
+            for alias in node.names:
+                object_name = alias.asname or alias.name
+                self.import_list[object_name].append(NodeInfo(node, -1))
+        else:
+            object_name = node.alias or node.module
+            self.import_list[object_name].append(NodeInfo(node, -1))
+
+    def _add_func_def_info(self, node: js_ast.JSFunctionDef):
+        self.func_def_list[node.name].append(NodeInfo(node, -1))
 
 
 def transform_class(class_def: js_ast.JSClassDef):
@@ -139,7 +165,7 @@ def transform_method_args(method_def: js_ast.JSMethodDef):
 
 
 def transform_call_to_new(node: js_ast.JSCall) -> js_ast.JSNew:
-    return js_ast.JSNew(class_=js_ast.JSName(node.func), args=node.args, keywords=node.keywords)
+    return js_ast.JSNew(class_=node.func, args=node.args, keywords=node.keywords)
 
 
 def replace_in_body(body: [js_ast.JSStatement], find: js_ast.JSNode, replace: js_ast.JSNode) -> [js_ast.JSStatement]:

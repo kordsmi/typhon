@@ -13,7 +13,7 @@ def test_transform_module():
         js_ast.JSFunctionDef('foo', js_ast.JSArguments(), []),
     ])
 
-    transform_module(js_module)
+    js_module = transform_module(js_module) or js_module
 
     assert js_module.export == js_ast.JSExport(['a', 'b', 'foo'])
 
@@ -25,7 +25,7 @@ def test_transform_module__insert_let():
     ]
     js_module = js_ast.JSModule(body=copy.deepcopy(original_body))
 
-    transform_module(js_module)
+    js_module = transform_module(js_module) or js_module
 
     assert js_module.export == js_ast.JSExport(['a'])
     assert js_module.body[0] == js_ast.JSLet(original_body[0])
@@ -37,20 +37,20 @@ def test_transform_module__export_imports():
         js_ast.JSImport('test', names=[js_ast.JSAlias('a', 'var_a'), js_ast.JSAlias('foo')]),
     ])
 
-    transform_module(js_module)
+    js_module = transform_module(js_module) or js_module
 
     assert js_module.export == js_ast.JSExport(['var_a', 'foo'])
 
 
 def test_transform_module__export_imports__all():
     js_module = js_ast.JSModule(body=[js_ast.JSImport('test', names=[])])
-    transform_module(js_module)
+    js_module = transform_module(js_module) or js_module
     assert js_module.export == js_ast.JSExport(['test'])
 
 
 def test_transform_module__export_class_names():
     js_module = js_ast.JSModule(body=[js_ast.JSClassDef(name='TestClass', body=[])])
-    transform_module(js_module)
+    js_module = transform_module(js_module) or js_module
     assert js_module.export == js_ast.JSExport(['TestClass'])
 
 
@@ -68,7 +68,7 @@ def test_transform_body__transform_class_method():
 def test_transform_body__transform_call_to_new():
     js_body = [
         js_ast.JSClassDef(name='TestClass', body=[]),
-        js_ast.JSCall(func='TestClass'),
+        js_ast.JSCall(func=js_ast.JSName('TestClass')),
     ]
 
     body_transformer = BodyTransformer(js_body)
@@ -143,12 +143,12 @@ class TestBodyTransformer:
         transpiler.transpile_src()
         body_transformer = BodyTransformer(transpiler.js_tree.body)
 
-        body_transformer.collect_objects_info()
+        body_transformer.transform()
 
         assert list(body_transformer.alias_list.keys()) == ['a']
         assert body_transformer.alias_list['a'] == [NodeInfo(
             node=js_ast.JSAssign(js_ast.JSAttribute(js_ast.JSName('a'), '__ty_alias__'), js_ast.JSConstant('b')),
-            index=0
+            index=-1
         )]
 
     def test_rename_variables_to_aliases(self):
@@ -160,7 +160,6 @@ c = a'''
         transpiler.parse()
         transpiler.transpile_src()
         body_transformer = BodyTransformer(transpiler.js_tree.body)
-        body_transformer.collect_objects_info()
 
         body_transformer.transform()
 

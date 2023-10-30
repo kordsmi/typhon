@@ -95,7 +95,7 @@ class JSBinOp(JSExpression):
         'right',
     )
 
-    def __init__(self, left, op, right):
+    def __init__(self, left: JSExpression, op: JSOperator, right: JSExpression):
         super().__init__(left=left, op=op, right=right)
 
 

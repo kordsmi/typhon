@@ -25,7 +25,7 @@ class Transpiler:
         self.js_tree = transpile_module(self.py_tree)
 
     def generate_js(self):
-        transform_module(self.js_tree)
+        self.js_tree = transform_module(self.js_tree) or self.js_tree
         return generate_js_module(self.js_tree)
 
 
