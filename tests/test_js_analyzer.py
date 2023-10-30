@@ -72,13 +72,13 @@ def test_transform_body__transform_call_to_new():
     ]
 
     body_transformer = BodyTransformer(js_body)
-    body_transformer.transform()
+    new_body = body_transformer.transform()
 
     expected = [
         js_ast.JSClassDef(name='TestClass', body=[]),
         js_ast.JSNew(class_=js_ast.JSName('TestClass')),
     ]
-    assert js_body == expected
+    assert new_body == expected
 
 
 def test_transform_function_to_method__replace_self_to_this():

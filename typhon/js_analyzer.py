@@ -53,56 +53,60 @@ class BodyTransformer(JSNodeVisitor):
         new_body = self.visit(self.body)
         if new_body:
             self.body = new_body
-        self.transform_classes()
-        self.transform_calls_to_new()
-
-        if new_body:
             return new_body
-
-    def transform_classes(self):
-        for class_name, info_list in self.class_def_list.items():
-            info: NodeInfo = info_list[0]
-            transform_class(info.node)
-
-    def transform_calls_to_new(self):
-        for name, info_list in self.call_list.items():
-            if name in self.class_def_list:
-                for info in info_list:
-                    self.body[info.index] = transform_call_to_new(info.node)
 
     def visit_JSAssign(self, node: js_ast.JSAssign) -> Optional[js_ast.JSAssign]:
         visited_node = super().visit_JSAssign(node)
         node = visited_node or node
+        new_node = None
+        if isinstance(node.target, js_ast.JSName):
+            new_node = self._visit_js_assign_to_name(node)
+        elif isinstance(node.target, js_ast.JSAttribute):
+            new_node = self._visit_js_assign_to_attribute(node)
+        return new_node or visited_node
+
+    def _visit_js_assign_to_name(self, node: js_ast.JSAssign) -> Optional[js_ast.JSLet]:
+        name = node.target.id
+        new_node = None
+        if name not in self.var_list:
+            new_node = js_ast.JSLet(node)
+        self.var_list[name].append(new_node or node)
+        return new_node
+
+    def _visit_js_assign_to_attribute(self, node: js_ast.JSAssign) -> Optional[js_ast.JSNop]:
         target = node.target
-        if isinstance(target, js_ast.JSName):
-            name = target.id
-            if not self.var_list[name]:
-                visited_node = js_ast.JSLet(node)
-            self.var_list[name].append(visited_node)
-        elif isinstance(target, js_ast.JSAttribute):
-            if isinstance(target.value, js_ast.JSName):
-                value_name = target.value.id
-                if target.attr == '__ty_alias__':
-                    self.alias_list[value_name].append(NodeInfo(node, -1))
-                    visited_node = js_ast.JSNop()
-        return visited_node
+        if not isinstance(target.value, js_ast.JSName):
+            return
+
+        if target.attr == '__ty_alias__':
+            self.alias_list[target.value.id].append(NodeInfo(node, -1))
+            return js_ast.JSNop()
 
     def visit_JSName(self, node: js_ast.JSName) -> Optional[js_ast.JSName]:
         var_name = node.id
-        if self.alias_list[var_name]:
+        if var_name in self.alias_list:
             alias_info = self.alias_list[var_name][0]
             assign_node: js_ast.JSAssign = alias_info.node
             value: js_ast.JSConstant = assign_node.value
             return js_ast.JSName(id=value.value)
 
-    def visit_JSCall(self, node: js_ast.JSCall) -> Optional[js_ast.JSCall]:
+    def visit_JSCall(self, node: js_ast.JSCall) -> Optional[js_ast.JSCall or js_ast.JSNew]:
         visited_node = super().visit_JSCall(node)
-        self._add_call_info(visited_node or node)
+        node = visited_node or node
+
+        new_node = self._check_and_transform_call_to_new(node)
+        if new_node:
+            return new_node
+
+        self._add_call_info(node)
         return visited_node
 
     def visit_JSClassDef(self, node: js_ast.JSClassDef) -> Optional['js_ast.JSClassDef']:
         visited_node = super().visit_JSClassDef(node)
+
+        transform_class(node)
         self._add_class_def_info(visited_node or node)
+
         return visited_node
 
     def visit_JSImport(self, node: js_ast.JSImport) -> Optional[js_ast.JSImport]:
@@ -135,6 +139,15 @@ class BodyTransformer(JSNodeVisitor):
     def _add_func_def_info(self, node: js_ast.JSFunctionDef):
         self.func_def_list[node.name].append(NodeInfo(node, -1))
 
+    def _check_and_transform_call_to_new(self, node: js_ast.JSCall) -> Optional[js_ast.JSNew]:
+        func = node.func
+        if not isinstance(func, js_ast.JSName):
+            return
+
+        func_name = func.id
+        if func_name in self.class_def_list:
+            return js_ast.JSNew(class_=node.func, args=node.args, keywords=node.keywords)
+
 
 def transform_class(class_def: js_ast.JSClassDef):
     class_body = class_def.body
@@ -162,10 +175,6 @@ def transform_method_args(method_def: js_ast.JSMethodDef):
         if arg.arg == 'self':
             method_def.args.args.remove(arg)
             break
-
-
-def transform_call_to_new(node: js_ast.JSCall) -> js_ast.JSNew:
-    return js_ast.JSNew(class_=node.func, args=node.args, keywords=node.keywords)
 
 
 def replace_in_body(body: [js_ast.JSStatement], find: js_ast.JSNode, replace: js_ast.JSNode) -> [js_ast.JSStatement]:
