@@ -1,8 +1,7 @@
 import copy
 
 from typhon import js_ast
-from typhon.js_analyzer import transform_module, transform_function_to_method, replace_in_body, BodyTransformer, \
-    NodeInfo
+from typhon.js_analyzer import transform_module, BodyTransformer, NodeInfo, ClassTransformer
 from typhon.transpiler import Transpiler
 
 
@@ -59,10 +58,10 @@ def test_transform_body__transform_class_method():
     js_node = js_ast.JSClassDef(name='A', body=class_body)
 
     body_transformer = BodyTransformer([js_node])
-    body_transformer.transform()
+    new_body = body_transformer.transform()
 
     expected_body = [js_ast.JSMethodDef(name='foo', args=js_ast.JSArguments(args=[]), body=[])]
-    assert js_node == js_ast.JSClassDef(name='A', body=expected_body)
+    assert new_body[0] == js_ast.JSClassDef(name='A', body=expected_body)
 
 
 def test_transform_body__transform_call_to_new():
@@ -92,7 +91,8 @@ def test_transform_function_to_method__replace_self_to_this():
         body=func_body
     )
 
-    result = transform_function_to_method(func_def)
+    class_transformer = ClassTransformer(None)
+    result = class_transformer.visit_JSFunctionDef(func_def)
 
     method_body = [js_ast.JSAssign(
         js_ast.JSAttribute(js_ast.JSName('this'), 'a'),
@@ -104,14 +104,17 @@ def test_transform_function_to_method__replace_self_to_this():
 
 def test_transform_function_to_method__constructor():
     func_def = js_ast.JSFunctionDef(name='__init__', args=js_ast.JSArguments(), body=[])
-    result = transform_function_to_method(func_def)
+
+    class_transformer = ClassTransformer(None)
+    result = class_transformer.visit_JSFunctionDef(func_def)
+
     assert result == js_ast.JSMethodDef(name='constructor', args=js_ast.JSArguments(), body=[])
 
 
 def test_replace_in_body__replace_call_args():
     body = [
         js_ast.JSCodeExpression(js_ast.JSCall(
-            func='a',
+            func=js_ast.JSName('a'),
             args=[js_ast.JSName(id='a'), js_ast.JSName(id='b')],
             keywords=[
                 js_ast.JSKeyWord(arg='c', value=js_ast.JSName('b')),
@@ -120,11 +123,15 @@ def test_replace_in_body__replace_call_args():
         ))
     ]
 
-    result = replace_in_body(body, js_ast.JSName('b'), js_ast.JSName('foo'))
+    body_transformer = BodyTransformer(body)
+    body_transformer.alias_list['b'].append(NodeInfo(
+        js_ast.JSAssign(target=js_ast.JSName('b'), value=js_ast.JSConstant('foo')), -1,
+    ))
+    result = body_transformer.transform()
 
     expected = [
         js_ast.JSCodeExpression(js_ast.JSCall(
-            func='a',
+            func=js_ast.JSName('a'),
             args=[js_ast.JSName(id='a'), js_ast.JSName(id='foo')],
             keywords=[
                 js_ast.JSKeyWord(arg='c', value=js_ast.JSName('foo')),
@@ -164,7 +171,6 @@ c = a'''
         body_transformer.transform()
 
         expected = [
-            js_ast.JSNop(),
             js_ast.JSLet(js_ast.JSAssign(js_ast.JSName('b'), js_ast.JSConstant(123))),
             js_ast.JSCodeExpression(js_ast.JSCall(js_ast.JSName('b'))),
             js_ast.JSLet(js_ast.JSAssign(js_ast.JSName('c'), js_ast.JSName('b'))),

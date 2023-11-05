@@ -102,12 +102,10 @@ class BodyTransformer(JSNodeVisitor):
         return visited_node
 
     def visit_JSClassDef(self, node: js_ast.JSClassDef) -> Optional['js_ast.JSClassDef']:
-        visited_node = super().visit_JSClassDef(node)
-
-        transform_class(node)
-        self._add_class_def_info(visited_node or node)
-
-        return visited_node
+        class_transformer = ClassTransformer(node)
+        new_class_def = class_transformer.transform()
+        self._add_class_def_info(new_class_def or node)
+        return new_class_def
 
     def visit_JSImport(self, node: js_ast.JSImport) -> Optional[js_ast.JSImport]:
         visited_node = super().visit_JSImport(node)
@@ -149,91 +147,29 @@ class BodyTransformer(JSNodeVisitor):
             return js_ast.JSNew(class_=node.func, args=node.args, keywords=node.keywords)
 
 
-def transform_class(class_def: js_ast.JSClassDef):
-    class_body = class_def.body
-    for i in range(len(class_body)):
-        node = class_body[i]
+class ClassTransformer(JSNodeVisitor):
+    def __init__(self, class_def: js_ast.JSClassDef):
+        self.class_def = class_def
 
-        if isinstance(node, js_ast.JSFunctionDef):
-            class_body[i] = transform_function_to_method(node)
+    def transform(self) -> Optional[js_ast.JSClassDef]:
+        new_body = self.visit(self.class_def.body)
+        if new_body:
+            return js_ast.JSClassDef(self.class_def.name, new_body)
 
+    def visit_JSFunctionDef(self, node: js_ast.JSFunctionDef) -> Optional[js_ast.JSFunctionDef]:
+        method_name = node.name
+        if method_name == '__init__':
+            method_name = 'constructor'
 
-def transform_function_to_method(func_def: js_ast.JSFunctionDef) -> js_ast.JSMethodDef:
-    method_def = js_ast.JSMethodDef(name=func_def.name, args=func_def.args, body=func_def.body)
-    transform_method_args(method_def)
-    replace_in_body(method_def.body, js_ast.JSName('self'), js_ast.JSName('this'))
-    if method_def.name == '__init__':
-        method_def.name = 'constructor'
-    return method_def
+        new_args = self.visit(node.args)
+        body_transformer = BodyTransformer(node.body)
+        body_transformer.alias_list['self'].append(
+            NodeInfo(js_ast.JSAssign(js_ast.JSName('self'), js_ast.JSConstant('this')), -1)
+        )
+        new_body = body_transformer.transform()
+        return js_ast.JSMethodDef(name=method_name, args=new_args or node.args, body=new_body or node.body)
 
-
-def transform_method_args(method_def: js_ast.JSMethodDef):
-    if not method_def.args.args:
-        return
-
-    for arg in method_def.args.args:
-        if arg.arg == 'self':
-            method_def.args.args.remove(arg)
-            break
-
-
-def replace_in_body(body: [js_ast.JSStatement], find: js_ast.JSNode, replace: js_ast.JSNode) -> [js_ast.JSStatement]:
-    for statement in body:
-        if isinstance(statement, js_ast.JSAssign):
-            replace_in_assign(statement, find, replace)
-        elif isinstance(statement, js_ast.JSCodeExpression):
-            replace_in_code_expression(statement, find, replace)
-    return body
-
-
-def replace_in_assign(node: js_ast.JSAssign, find: js_ast.JSNode, replace: js_ast.JSNode) -> js_ast.JSAssign:
-    node.target = replace_in_expression(node.target, find, replace)
-    node.value = replace_in_expression(node.value, find, replace)
-    return node
-
-
-def replace_in_code_expression(
-        node: js_ast.JSCodeExpression, find: js_ast.JSNode, replace: js_ast.JSNode
-) -> js_ast.JSCodeExpression:
-    new_value = replace_in_expression(node.value, find, replace)
-    if new_value != node.value:
-        node.value = new_value
-    return node
-
-
-def replace_in_expression(
-        expr: js_ast.JSExpression, find: js_ast.JSNode, replace: js_ast.JSNode
-) -> js_ast.JSExpression:
-    if expr == find:
-        return replace
-
-    if isinstance(expr, js_ast.JSAttribute):
-        return replace_in_attribute(expr, find, replace)
-    elif isinstance(expr, js_ast.JSCall):
-        return replace_in_call(expr, find, replace)
-
-    return expr
-
-
-def replace_in_attribute(attr: js_ast.JSAttribute, find: js_ast.JSNode, replace: js_ast.JSNode) -> js_ast.JSAttribute:
-    attr.value = replace_in_expression(attr.value, find, replace)
-    return attr
-
-
-def replace_in_call(node: js_ast.JSCall, find: js_ast.JSNode, replace: js_ast.JSNode) -> js_ast.JSCall:
-    node.func = replace_in_expression(node.func, find, replace)
-
-    if node.args:
-        for i in range(len(node.args)):
-            arg = node.args[i]
-            new_arg = replace_in_expression(arg, find, replace)
-            if new_arg != arg:
-                node.args[i] = new_arg
-
-    if node.keywords:
-        for keyword in node.keywords:
-            new_value = replace_in_expression(keyword.value, find, replace)
-            if new_value != keyword.value:
-                keyword.value = new_value
-
-    return node
+    def visit_JSArg(self, node: js_ast.JSArg) -> Optional[js_ast.JSArg]:
+        if node.arg == 'self':
+            return js_ast.JSNop()
+        return super().visit_JSArg(node)

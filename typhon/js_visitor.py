@@ -1,6 +1,20 @@
+import typing
 from typing import Optional, List
 
 from typhon import js_ast
+
+
+def _one_of(*args):
+    for item in args:
+        if item is not None:
+            return True
+    return False
+
+
+def _or(item1, item2) -> typing.Any:
+    if item1 is not None:
+        return item1
+    return item2
 
 
 class JSNodeVisitor:
@@ -13,14 +27,17 @@ class JSNodeVisitor:
         return method(node)
 
     def visit_list(self, node_list: [js_ast.JSNode]) -> [js_ast.JSNode]:
-        new_list = list(node_list)
+        new_list = []
         modified = False
-        for i in range(len(new_list)):
-            item = new_list[i]
+        for item in node_list:
             new_item = self.visit(item)
             if new_item:
-                new_list[i] = new_item
                 modified = True
+                if isinstance(new_item, js_ast.JSNop):
+                    continue
+                new_list.append(new_item)
+            else:
+                new_list.append(item)
 
         if modified:
             return new_list
@@ -62,9 +79,10 @@ class JSNodeVisitor:
         kwarg = node.kwarg
         new_kwarg = self.visit(kwarg) if kwarg else None
 
-        if new_args or new_defaults or new_vararg or new_kwonlyargs or new_kw_defaults or new_kwarg:
-            return js_ast.JSArguments(new_args or args, new_defaults or defaults, new_vararg or vararg,
-                                      new_kwonlyargs or kwonlyargs, new_kw_defaults or kw_defaults, new_kwarg or kwarg)
+        if _one_of(new_args, new_defaults, new_vararg, new_kwonlyargs, new_kw_defaults, new_kwarg):
+            return js_ast.JSArguments(_or(new_args, args), _or(new_defaults, defaults), _or(new_vararg, vararg),
+                                      _or(new_kwonlyargs, kwonlyargs), _or(new_kw_defaults, kw_defaults),
+                                      _or(new_kwarg, kwarg))
 
     def visit_JSImport(self, node: js_ast.JSImport) -> Optional[js_ast.JSImport]:
         new_names = self.visit(node.names) if node.names else None
@@ -104,3 +122,8 @@ class JSNodeVisitor:
         new_value = self.visit(node.value)
         if new_value:
             return js_ast.JSAttribute(new_value or node.value, node.attr)
+
+    def visit_JSKeyWord(self, node: js_ast.JSKeyWord) -> Optional[js_ast.JSKeyWord]:
+        new_value = self.visit(node.value)
+        if new_value:
+            return js_ast.JSKeyWord(arg=node.arg, value=_or(new_value, node.value))
