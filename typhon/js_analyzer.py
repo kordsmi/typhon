@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from typhon import js_ast
+from typhon.identifires import ContextIdentifiers, Identifiers, ID_CLASS
 from typhon.js_visitor import JSNodeVisitor
 
 
@@ -22,32 +23,19 @@ class NodeInfo:
 
 
 class BodyTransformer(JSNodeVisitor):
-    def __init__(self, body: [js_ast.JSStatement]):
+    def __init__(
+            self,
+            body: [js_ast.JSStatement],
+            global_ids: Optional[Identifiers] = None,
+            context_ids: Optional[Identifiers] = None,
+    ):
         self.body = body
-        self.var_list = defaultdict(list)
-        self.class_def_list = defaultdict(list)
-        self.func_def_list = defaultdict(list)
-        self.import_list = defaultdict(list)
         self.call_list = defaultdict(list)
         self.alias_list = defaultdict(list)
+        self.ids = ContextIdentifiers(global_ids, context_ids)
 
     def get_identifies(self):
-        info = []
-
-        def add_name(name: str):
-            if name not in info:
-                info.append(name)
-
-        def add_names(info_dict: {}):
-            for item in info_dict.keys():
-                add_name(item)
-
-        add_names(self.var_list)
-        add_names(self.func_def_list)
-        add_names(self.class_def_list)
-        add_names(self.import_list)
-
-        return info
+        return self.ids.get_id_list()
 
     def transform(self):
         new_body = self.visit(self.body)
@@ -68,9 +56,9 @@ class BodyTransformer(JSNodeVisitor):
     def _visit_js_assign_to_name(self, node: js_ast.JSAssign) -> Optional[js_ast.JSLet]:
         name = node.target.id
         new_node = None
-        if name not in self.var_list:
+        if not self.ids.get_id_info(name):
             new_node = js_ast.JSLet(node)
-        self.var_list[name].append(new_node or node)
+            self.ids.add(new_node or node, name)
         return new_node
 
     def _visit_js_assign_to_attribute(self, node: js_ast.JSAssign) -> Optional[js_ast.JSNop]:
@@ -104,7 +92,7 @@ class BodyTransformer(JSNodeVisitor):
     def visit_JSClassDef(self, node: js_ast.JSClassDef) -> Optional['js_ast.JSClassDef']:
         class_transformer = ClassTransformer(node)
         new_class_def = class_transformer.transform()
-        self._add_class_def_info(new_class_def or node)
+        self.ids.add(new_class_def or node)
         return new_class_def
 
     def visit_JSImport(self, node: js_ast.JSImport) -> Optional[js_ast.JSImport]:
@@ -114,7 +102,7 @@ class BodyTransformer(JSNodeVisitor):
 
     def visit_JSFunctionDef(self, node: js_ast.JSFunctionDef) -> Optional[js_ast.JSFunctionDef]:
         visited_node = super().visit_JSFunctionDef(node)
-        self._add_func_def_info(visited_node or node)
+        self.ids.add(visited_node or node)
         return visited_node
 
     def _add_call_info(self, node: js_ast.JSCall):
@@ -122,20 +110,14 @@ class BodyTransformer(JSNodeVisitor):
         if isinstance(func, js_ast.JSName):
             self.call_list[func.id].append(NodeInfo(node, -1))
 
-    def _add_class_def_info(self, node: js_ast.JSClassDef):
-        self.class_def_list[node.name].append(NodeInfo(node, -1))
-
     def _add_import_info(self, node: js_ast.JSImport):
         if node.names:
             for alias in node.names:
                 object_name = alias.asname or alias.name
-                self.import_list[object_name].append(NodeInfo(node, -1))
+                self.ids.add(node, object_name)
         else:
             object_name = node.alias or node.module
-            self.import_list[object_name].append(NodeInfo(node, -1))
-
-    def _add_func_def_info(self, node: js_ast.JSFunctionDef):
-        self.func_def_list[node.name].append(NodeInfo(node, -1))
+            self.ids.add(node, object_name)
 
     def _check_and_transform_call_to_new(self, node: js_ast.JSCall) -> Optional[js_ast.JSNew]:
         func = node.func
@@ -143,7 +125,8 @@ class BodyTransformer(JSNodeVisitor):
             return
 
         func_name = func.id
-        if func_name in self.class_def_list:
+        id_info = self.ids.get_id_info(func_name)
+        if id_info and id_info.id_type == ID_CLASS:
             return js_ast.JSNew(class_=node.func, args=node.args, keywords=node.keywords)
 
 

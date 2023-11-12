@@ -23,6 +23,11 @@ class Identifiers:
         self.identifiers = {}
 
     def add(self, node: js_ast.JSNode, name: str = None):
+        original_node = node
+
+        if isinstance(node, js_ast.JSLet):
+            node = node.assign
+
         if isinstance(node, js_ast.JSAssign):
             target = node.target
             if not name:
@@ -43,7 +48,7 @@ class Identifiers:
         else:
             raise UnsupportedNode(f'Cannot add unsupported node {node.__class__} to identifiers')
 
-        self.identifiers[name] = IDInfo(name, node, id_type)
+        self.identifiers[name] = IDInfo(name, original_node, id_type)
 
     def get_id_info(self, id_name: str) -> Optional[IDInfo]:
         return self.identifiers.get(id_name)
