@@ -1,73 +1,73 @@
 from typhon import js_ast
-from typhon.identifires import Identifiers, IDInfo, ID_VAR, ID_CLASS, ID_FUNCTION, ID_IMPORT, ContextIdentifiers
+from typhon.identifires import ObjectInfo, ID_VAR, ID_CLASS, ID_FUNCTION, ID_IMPORT, ContextObjects, get_object_info
 
 
 class TestIdentifiers:
     def test_add_var(self):
-        identifiers = Identifiers()
+        identifiers = {}
         js_assign = js_ast.JSAssign(js_ast.JSName('a'), js_ast.JSConstant(100))
 
-        identifiers.add(js_ast.JSAssign(js_ast.JSName('a'), js_ast.JSConstant(100)))
+        identifiers['a'] = get_object_info(js_ast.JSAssign(js_ast.JSName('a'), js_ast.JSConstant(100)))
 
-        assert identifiers.identifiers == {'a': IDInfo('a', js_assign, ID_VAR)}
+        assert identifiers == {'a': ObjectInfo('a', js_assign, ID_VAR)}
 
     def test_add_class(self):
-        identifiers = Identifiers()
+        identifiers = {}
         js_class_def = js_ast.JSClassDef(name='Foo', body=[])
 
-        identifiers.add(js_class_def)
+        identifiers['Foo'] = get_object_info(js_class_def)
 
-        assert identifiers.identifiers == {'Foo': IDInfo('Foo', js_class_def, ID_CLASS)}
+        assert identifiers == {'Foo': ObjectInfo('Foo', js_class_def, ID_CLASS)}
 
     def test_add_func(self):
-        identifiers = Identifiers()
+        identifiers = {}
         js_func_def = js_ast.JSFunctionDef(name='test_func', args=js_ast.JSArguments(), body=[])
 
-        identifiers.add(js_func_def)
+        identifiers['test_func'] = get_object_info(js_func_def)
 
-        assert identifiers.identifiers == {'test_func': IDInfo('test_func', js_func_def, ID_FUNCTION)}
+        assert identifiers == {'test_func': ObjectInfo('test_func', js_func_def, ID_FUNCTION)}
 
     def test_add_import(self):
-        identifiers = Identifiers()
+        identifiers = {}
         js_import = js_ast.JSImport(module='test_module', names=[js_ast.JSAlias(name='var1')])
 
-        identifiers.add(js_import, 'var1')
+        identifiers['var1'] = get_object_info(js_import, 'var1')
 
-        assert identifiers.identifiers == {'var1': IDInfo('var1', js_import, ID_IMPORT)}
+        assert identifiers == {'var1': ObjectInfo('var1', js_import, ID_IMPORT)}
 
 
 class TestContextIdentifiers:
     def test_set_var_to_local_zone(self):
-        global_ids = Identifiers()
-        context_ids = Identifiers()
+        global_ids = {}
+        context_ids = {}
         assign_node = js_ast.JSAssign(js_ast.JSName('a'), js_ast.JSConstant(100))
         func_node = js_ast.JSFunctionDef('a', js_ast.JSArguments(), [])
         import_node = js_ast.JSImport(module='foo', names=[js_ast.JSAlias('a')])
-        global_ids.add(assign_node)
-        context_ids.add(func_node)
-        context = ContextIdentifiers(global_ids, context_ids)
+        global_ids['a'] = get_object_info(assign_node)
+        context_ids['a'] = get_object_info(func_node)
+        context = ContextObjects(global_ids, context_ids)
         context.add(import_node, 'a')
-        assert context.locals.identifiers == {'a': IDInfo('a', import_node, ID_IMPORT)}
+        assert context.locals == {'a': ObjectInfo('a', import_node, ID_IMPORT)}
 
     def test_get_id_info(self):
         assign_node_1 = js_ast.JSAssign(js_ast.JSName('a'), js_ast.JSConstant(10))
         assign_node_2 = js_ast.JSAssign(js_ast.JSName('a'), js_ast.JSConstant(20))
         assign_node_3 = js_ast.JSAssign(js_ast.JSName('a'), js_ast.JSConstant(30))
-        context = ContextIdentifiers()
+        context = ContextObjects()
 
         assert context.get_id_info('a') is None
 
-        context.globals.add(assign_node_1)
-        assert context.get_id_info('a') == IDInfo('a', assign_node_1, ID_VAR)
+        context.globals['a'] = get_object_info(assign_node_1)
+        assert context.get_id_info('a') == get_object_info(assign_node_1)
 
-        context.context.add(assign_node_2)
-        assert context.get_id_info('a') == IDInfo('a', assign_node_2, ID_VAR)
+        context.context['a'] = get_object_info(assign_node_2)
+        assert context.get_id_info('a') == get_object_info(assign_node_2)
 
-        context.add(assign_node_3)
-        assert context.get_id_info('a') == IDInfo('a', assign_node_3, ID_VAR)
+        context.locals['a'] = get_object_info(assign_node_3)
+        assert context.get_id_info('a') == get_object_info(assign_node_3)
 
     def test_get_id_list__empty(self):
-        context = ContextIdentifiers()
+        context = ContextObjects()
         assert context.get_id_list() == []
 
     def test_get_id_list(self):
@@ -75,12 +75,12 @@ class TestContextIdentifiers:
         assign_node_2 = js_ast.JSAssign(js_ast.JSName('b'), js_ast.JSConstant(20))
         assign_node_3 = js_ast.JSAssign(js_ast.JSName('c'), js_ast.JSConstant(30))
         assign_node_4 = js_ast.JSAssign(js_ast.JSName('d'), js_ast.JSConstant(40))
-        context = ContextIdentifiers()
-        context.globals.add(assign_node_1)
-        context.globals.add(assign_node_3)
-        context.context.add(assign_node_2)
-        context.locals.add(assign_node_3)
-        context.locals.add(assign_node_4)
+        context = ContextObjects()
+        context.globals['a'] = get_object_info(assign_node_1)
+        context.globals['c'] = get_object_info(assign_node_3)
+        context.context['b'] = get_object_info(assign_node_2)
+        context.locals['c'] = get_object_info(assign_node_3)
+        context.locals['d'] = get_object_info(assign_node_4)
 
         assert context.get_id_list() == ['a', 'c', 'b', 'd']
 
@@ -89,15 +89,15 @@ class TestContextIdentifiers:
         assign_node_2 = js_ast.JSAssign(js_ast.JSName('b'), js_ast.JSConstant(20))
         assign_node_3 = js_ast.JSAssign(js_ast.JSName('c'), js_ast.JSConstant(30))
         assign_node_4 = js_ast.JSAssign(js_ast.JSName('c'), js_ast.JSConstant(40))
-        context = ContextIdentifiers()
-        context.globals.add(assign_node_1)
-        context.globals.add(assign_node_3)
-        context.context.add(assign_node_2)
-        context.context.add(assign_node_3)
-        context.locals.add(assign_node_4)
+        context = ContextObjects()
+        context.globals['a'] = get_object_info(assign_node_1)
+        context.globals['c'] = get_object_info(assign_node_3)
+        context.context['b'] = get_object_info(assign_node_2)
+        context.context['c'] = get_object_info(assign_node_3)
+        context.locals['c'] = get_object_info(assign_node_4)
 
         local_context_ids = context.get_local_context_ids()
 
-        assert local_context_ids.get_id_list() == ['b', 'c']
-        assert local_context_ids.get_id_info('b') == IDInfo('b', assign_node_2, ID_VAR)
-        assert local_context_ids.get_id_info('c') == IDInfo('c', assign_node_4, ID_VAR)
+        assert list(local_context_ids.keys()) == ['b', 'c']
+        assert local_context_ids.get('b') == get_object_info(assign_node_2)
+        assert local_context_ids.get('c') == get_object_info(assign_node_4)

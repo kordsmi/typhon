@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from typhon import js_ast
-from typhon.identifires import ContextIdentifiers, Identifiers, ID_CLASS
+from typhon.identifires import ContextObjects, ID_CLASS
 from typhon.js_visitor import JSNodeVisitor
 
 
@@ -26,13 +26,13 @@ class BodyTransformer(JSNodeVisitor):
     def __init__(
             self,
             body: [js_ast.JSStatement],
-            global_ids: Optional[Identifiers] = None,
-            context_ids: Optional[Identifiers] = None,
+            global_ids: dict = None,
+            context_ids: dict = None,
     ):
         self.body = body
         self.call_list = defaultdict(list)
         self.alias_list = defaultdict(list)
-        self.ids = ContextIdentifiers(global_ids, context_ids)
+        self.ids = ContextObjects(global_ids, context_ids)
 
     def get_identifies(self):
         return self.ids.get_id_list()
@@ -126,7 +126,7 @@ class BodyTransformer(JSNodeVisitor):
 
         func_name = func.id
         id_info = self.ids.get_id_info(func_name)
-        if id_info and id_info.id_type == ID_CLASS:
+        if id_info and id_info.object_type == ID_CLASS:
             return js_ast.JSNew(class_=node.func, args=node.args, keywords=node.keywords)
 
 
