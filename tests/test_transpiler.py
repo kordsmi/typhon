@@ -4,18 +4,9 @@ import pytest
 
 from typhon import js_ast
 from typhon.exceptions import InvalidNode
-from typhon.transpiler import transpile, transpile_bin_op, transpile_call, transpile_assign, transpile_expression, \
+from typhon.transpiler import transpile_bin_op, transpile_call, transpile_assign, transpile_expression, \
     Transpiler, transpile_arg, transpile_arguments, transpile_statement, transpile_function_def, transpile_return, \
     transpile_arg_list, transpile_expression_list, transpile_body, transpile_constant, transpile_eq, transpile_module
-
-
-def test_transpiler():
-    py_str = 'print(1 + 2)'
-    js_str = 'export {};\n\nprint(1 + 2);'
-
-    result = transpile(py_str)
-
-    assert result == js_str
 
 
 class TestTranspiler:

@@ -16,6 +16,7 @@ class Transpiler:
     def transpile(self):
         self.parse()
         self.transpile_src()
+        self.transform_code()
         return self.generate_js()
 
     def parse(self):
@@ -24,14 +25,11 @@ class Transpiler:
     def transpile_src(self):
         self.js_tree = transpile_module(self.py_tree)
 
-    def generate_js(self):
+    def transform_code(self):
         self.js_tree = transform_module(self.js_tree) or self.js_tree
+
+    def generate_js(self):
         return generate_js_module(self.js_tree)
-
-
-def transpile(src: str) -> str:
-    transpiler = Transpiler(src)
-    return transpiler.transpile()
 
 
 def transpile_bin_op(node: ast.BinOp) -> js_ast.JSBinOp:
