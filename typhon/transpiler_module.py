@@ -12,10 +12,7 @@ class Module:
         self.ast_dump_name = f'{file_name}_ast.txt'
 
     def transpile(self):
-        with open(self.source_file_path, 'r') as f:
-            source_code = f.read()
-
-        transpiler = Transpiler(source_code)
+        transpiler = Transpiler(self.get_source())
 
         try:
             target_code = transpiler.transpile()
@@ -28,3 +25,8 @@ class Module:
             f.write(target_code)
 
         return self.target_file_name
+
+    def get_source(self):
+        with open(self.source_file_path, 'r') as f:
+            source_code = f.read()
+        return source_code

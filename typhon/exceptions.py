@@ -23,3 +23,7 @@ class InvalidNode(Exception):
 
 class UnsupportedNode(Exception):
     pass
+
+
+class TyphonImportError(Exception):
+    pass
