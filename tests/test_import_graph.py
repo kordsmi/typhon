@@ -1,20 +1,8 @@
-import os.path
-from contextlib import contextmanager
-
 import pytest
 
+from tests.helpers import source_file
 from typhon.exceptions import TyphonImportError
 from typhon.import_graph import ImportGraph
-
-
-@contextmanager
-def source_file(file_name, source=''):
-    try:
-        with open(file_name, 'w') as f:
-            f.write(source)
-        yield
-    finally:
-        os.unlink(file_name)
 
 
 class TestImportGraph:

@@ -30,10 +30,11 @@ class ImportCollector(ast.NodeVisitor):
 
 
 class ImportGraph:
-    def __init__(self, source: str):
+    def __init__(self, source: str, source_path: str = None):
         self.source = source
         self.graph = {}
         self.queue = []
+        self.source_path = source_path or '.'
 
     def get_graph(self) -> dict:
         self.graph = {}
@@ -54,7 +55,7 @@ class ImportGraph:
 
     def get_module_source(self, module_name):
         module_path = module_name + '.py'
-        module = Module(module_path)
+        module = Module(module_path, source_path=self.source_path)
         source = module.get_source()
         return source
 
