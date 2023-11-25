@@ -1,6 +1,5 @@
 from typhon.import_graph import ImportGraph
-from typhon.transpiler import Transpiler
-from typhon.transpiler_module import Module
+from typhon.transpiler_module import ModuleFile, ModuleSource
 
 
 class Project:
@@ -12,9 +11,9 @@ class Project:
         """
         Транспиляция переданного исходного кода. В ответе возвращается js-код.
         """
+        module = ModuleSource(source, source_path=self.source_path)
         self.transpile_modules(source)
-        transpiler = Transpiler(source)
-        return transpiler.transpile()
+        return module.transpile()
 
     def transpile_modules(self, source: str):
         self.get_import_graph(source)
@@ -32,9 +31,10 @@ class Project:
         """
         Транспиляция файла с исходным кодом. В ответ возвращается путь к оттранспилированному js-файлу.
         """
-        module = Module(source_file_path, source_path=self.source_path)
+        module = ModuleFile(source_file_path, source_path=self.source_path)
         self.transpile_modules(module.get_source())
-        return module.transpile()
+        module.transpile()
+        return module.target_file_name
 
     def get_sorted_modules_from_graph(self):
         result = []
@@ -53,5 +53,5 @@ class Project:
 
     def transpile_module(self, module_name):
         module_file = module_name + '.py'
-        module = Module(module_file, source_path=self.source_path)
+        module = ModuleFile(module_file, source_path=self.source_path)
         return module.transpile()

@@ -5,39 +5,35 @@ import pytest
 from typhon import js_ast
 from typhon.exceptions import InvalidNode
 from typhon.transpiler import transpile_bin_op, transpile_call, transpile_assign, transpile_expression, \
-    Transpiler, transpile_arg, transpile_arguments, transpile_statement, transpile_function_def, transpile_return, \
+    transpile_arg, transpile_arguments, transpile_statement, transpile_function_def, transpile_return, \
     transpile_arg_list, transpile_expression_list, transpile_body, transpile_constant, transpile_eq, transpile_module
 
 
-class TestTranspiler:
-    def test_transpile_multiple_expressions(self):
-        src = '''a = 1
+def test_transpile_multiple_expressions():
+    src = '''a = 1
 print('a + 2 = ', a + 2)'''
-        transpiler = Transpiler(src)
-        transpiler.parse()
+    py_tree = ast.parse(src)
+    js_tree = transpile_module(py_tree)
 
-        transpiler.transpile_src()
+    expected = js_ast.JSModule(body=[
+        js_ast.JSAssign(target=js_ast.JSName(id='a'), value=js_ast.JSConstant(value=1)),
+        js_ast.JSCodeExpression(js_ast.JSCall(func=js_ast.JSName('print'), args=[
+            js_ast.JSConstant(value='a + 2 = '),
+            js_ast.JSBinOp(left=js_ast.JSName(id='a'), op=js_ast.JSAdd(), right=js_ast.JSConstant(value=2)),
+        ]))
+    ])
+    assert js_tree == expected
 
-        expected = js_ast.JSModule(body=[
-            js_ast.JSAssign(target=js_ast.JSName(id='a'), value=js_ast.JSConstant(value=1)),
-            js_ast.JSCodeExpression(js_ast.JSCall(func=js_ast.JSName('print'), args=[
-                js_ast.JSConstant(value='a + 2 = '),
-                js_ast.JSBinOp(left=js_ast.JSName(id='a'), op=js_ast.JSAdd(), right=js_ast.JSConstant(value=2)),
-            ]))
-        ])
-        assert transpiler.js_tree == expected
 
-    def test_transpile_function(self):
-        src = '''def foo(a):
+def test_transpile_function():
+    src = '''def foo(a):
     return a'''
-        transpiler = Transpiler(src)
-        transpiler.parse()
+    py_tree = ast.parse(src)
+    js_tree = transpile_module(py_tree)
 
-        transpiler.transpile_src()
-
-        expected = js_ast.JSModule([transpile_function_def(transpiler.py_tree.body[0])])
-        assert transpiler.js_tree == expected
-        assert transpiler.js_tree.body[0].body[0] == transpile_return(transpiler.py_tree.body[0].body[0])
+    expected = js_ast.JSModule([transpile_function_def(py_tree.body[0])])
+    assert js_tree == expected
+    assert js_tree.body[0].body[0] == transpile_return(py_tree.body[0].body[0])
 
 
 def test_transpile_set_variable__int():

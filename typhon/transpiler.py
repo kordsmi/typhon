@@ -3,33 +3,6 @@ from typing import Optional, List
 
 from typhon import js_ast
 from typhon.exceptions import InvalidNode
-from typhon.generator import generate_js_module
-from typhon.js_analyzer import transform_module
-
-
-class Transpiler:
-    def __init__(self, src: str):
-        self.py_tree: Optional[ast.Module] = None
-        self.js_tree = None
-        self.src: str = src
-
-    def transpile(self):
-        self.parse()
-        self.transpile_src()
-        self.transform_code()
-        return self.generate_js()
-
-    def parse(self):
-        self.py_tree = ast.parse(self.src)
-
-    def transpile_src(self):
-        self.js_tree = transpile_module(self.py_tree)
-
-    def transform_code(self):
-        self.js_tree = transform_module(self.js_tree) or self.js_tree
-
-    def generate_js(self):
-        return generate_js_module(self.js_tree)
 
 
 def transpile_bin_op(node: ast.BinOp) -> js_ast.JSBinOp:

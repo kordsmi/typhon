@@ -1,8 +1,9 @@
+import ast
 import copy
 
 from typhon import js_ast
 from typhon.js_analyzer import transform_module, BodyTransformer, NodeInfo, ClassTransformer
-from typhon.transpiler import Transpiler
+from typhon.transpiler import transpile_module
 
 
 def test_transform_module():
@@ -145,10 +146,9 @@ def test_replace_in_body__replace_call_args():
 class TestBodyTransformer:
     def test_collect_typhon_aliases(self):
         code = 'a.__ty_alias__ = "b"'
-        transpiler = Transpiler(code)
-        transpiler.parse()
-        transpiler.transpile_src()
-        body_transformer = BodyTransformer(transpiler.js_tree.body)
+        py_tree = ast.parse(code)
+        js_tree = transpile_module(py_tree)
+        body_transformer = BodyTransformer(js_tree.body)
 
         body_transformer.transform()
 
@@ -163,10 +163,9 @@ class TestBodyTransformer:
 a = 123
 a()
 c = a'''
-        transpiler = Transpiler(code)
-        transpiler.parse()
-        transpiler.transpile_src()
-        body_transformer = BodyTransformer(transpiler.js_tree.body)
+        py_tree = ast.parse(code)
+        js_tree = transpile_module(py_tree)
+        body_transformer = BodyTransformer(js_tree.body)
 
         body_transformer.transform()
 

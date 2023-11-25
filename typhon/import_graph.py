@@ -3,7 +3,7 @@ from _ast import Import, AST
 from typing import Any
 
 from typhon.exceptions import TyphonImportError
-from typhon.transpiler_module import Module
+from typhon.transpiler_module import ModuleFile
 
 
 class ImportCollector(ast.NodeVisitor):
@@ -55,7 +55,7 @@ class ImportGraph:
 
     def get_module_source(self, module_name):
         module_path = module_name + '.py'
-        module = Module(module_path, source_path=self.source_path)
+        module = ModuleFile(module_path, source_path=self.source_path)
         source = module.get_source()
         return source
 
