@@ -1,8 +1,9 @@
 import ast
 import os.path
 
+from typhon import js_ast
 from typhon.generator import generate_js_module
-from typhon.js_analyzer import transform_module
+from typhon.js_analyzer import BodyTransformer
 from typhon.transpiler import transpile_module
 
 
@@ -26,7 +27,7 @@ class ModuleTranspiler:
     def transpile_module(self):
         self.py_tree = ast.parse(self.get_source())
         self.js_tree = transpile_module(self.py_tree)
-        self.js_tree = transform_module(self.js_tree) or self.js_tree
+        self.transform()
         return generate_js_module(self.js_tree)
 
     def save_js(self, target_code):
@@ -50,6 +51,13 @@ class ModuleTranspiler:
 
     def get_source(self):
         return ''
+
+    def transform(self):
+        body_transformer = BodyTransformer(self.js_tree.body)
+        new_body = body_transformer.transform()
+        info = body_transformer.get_identifies()
+        export = js_ast.JSExport(info)
+        self.js_tree = js_ast.JSModule(body=new_body or self.js_tree.body, export=export)
 
 
 class ModuleFile(ModuleTranspiler):

@@ -7,15 +7,6 @@ from typhon.identifires import ContextObjects, ID_CLASS
 from typhon.js_visitor import JSNodeVisitor
 
 
-def transform_module(js_module: js_ast.JSModule):
-    body_transformer = BodyTransformer(js_module.body)
-    new_body = body_transformer.transform()
-    info = body_transformer.get_identifies()
-    export = js_ast.JSExport(info)
-
-    return js_ast.JSModule(body=new_body or js_module.body, export=export)
-
-
 @dataclass
 class NodeInfo:
     node: js_ast.JSNode
