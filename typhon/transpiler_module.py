@@ -1,5 +1,8 @@
 import ast
+import datetime
+import json
 import os.path
+from functools import cached_property
 
 from typhon import js_ast
 from typhon.generator import generate_js_module
@@ -14,6 +17,8 @@ class ModuleTranspiler:
         self.ast_dump_name = None
         self.py_tree = None
         self.js_tree = None
+        self.objects = []
+        self.module_name = '__main__'
 
     def transpile(self):
         try:
@@ -22,6 +27,7 @@ class ModuleTranspiler:
             self.dump_ast()
 
         self.save_js(target_code)
+        self.save_info()
         return target_code
 
     def transpile_module(self):
@@ -55,9 +61,38 @@ class ModuleTranspiler:
     def transform(self):
         body_transformer = BodyTransformer(self.js_tree.body)
         new_body = body_transformer.transform()
-        info = body_transformer.get_identifies()
-        export = js_ast.JSExport(info)
+        self.objects = body_transformer.get_identifies()
+        export = js_ast.JSExport(self.objects)
         self.js_tree = js_ast.JSModule(body=new_body or self.js_tree.body, export=export)
+
+    @cached_property
+    def cache_directory(self):
+        cache_directory = os.path.join(self.source_path, '.ty_cache')
+        if not os.path.exists(cache_directory):
+            os.mkdir(cache_directory)
+
+        gitignore_file = os.path.join(cache_directory, '.gitignore')
+        with open(gitignore_file, 'w') as f:
+            f.write('*')
+
+        return cache_directory
+
+    def save_info(self):
+        json_info_file = os.path.join(self.cache_directory, f'{self.module_name}.json')
+        objects = []
+        for object_name in self.objects:
+            objects.append({
+                'id': object_name,
+                'module': self.module_name,
+                'type': 'object',
+                'features': [],
+            })
+        info = {
+            'updated': datetime.datetime.now().isoformat(),
+            'objects': objects
+        }
+        with open(json_info_file, 'w') as f:
+            json.dump(info, f)
 
 
 class ModuleFile(ModuleTranspiler):
@@ -67,6 +102,7 @@ class ModuleFile(ModuleTranspiler):
         file_name, ext = os.path.splitext(source_file_path)
         self.target_file_name = f'{file_name}.js'
         self.ast_dump_name = f'{file_name}_ast.txt'
+        self.module_name = os.path.basename(file_name)
 
     def get_source(self):
         source_file_path = os.path.join(self.source_path, self.source_file_path)

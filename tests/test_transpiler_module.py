@@ -1,7 +1,13 @@
 import copy
+import datetime
+import json
+import os.path
+import zoneinfo
+from tempfile import TemporaryDirectory
 
+from tests.helpers import source_file
 from typhon import js_ast
-from typhon.transpiler_module import ModuleTranspiler
+from typhon.transpiler_module import ModuleTranspiler, ModuleSource, ModuleFile
 
 
 class TestModuleTranspiler:
@@ -54,3 +60,45 @@ class TestModuleTranspiler:
         js_module = js_ast.JSModule(body=[js_ast.JSClassDef(name='TestClass', body=[])])
         js_module = self.transform(js_module)
         assert js_module.export == js_ast.JSExport(['TestClass'])
+
+    def test_cache_directory(self):
+        source = 'print(a)'
+        with TemporaryDirectory() as temp_dir:
+            module_transpiler = ModuleSource(source, temp_dir)
+            module_transpiler.transpile()
+
+            cache_directory = os.path.join(temp_dir, '.ty_cache')
+            gitignore_file = os.path.join(cache_directory, '.gitignore')
+            with open(gitignore_file, 'r') as f:
+                gitignore_content = f.read()
+                assert gitignore_content == '*'
+
+    def test_save_module_info(self):
+        source = 'a = 123'
+        with TemporaryDirectory() as temp_dir:
+            source_filename = os.path.join(temp_dir, 'a.py')
+            with source_file(source_filename, source):
+                module_transpiler = ModuleFile(source_filename, temp_dir)
+                module_transpiler.transpile()
+
+                cache_directory = os.path.join(temp_dir, '.ty_cache')
+                info_file = os.path.join(cache_directory, 'a.json')
+                with open(info_file, 'r') as f:
+                    info_json_data = f.read()
+
+        info_data = json.loads(info_json_data)
+        expected = {
+            'updated': info_data['updated'],
+            'objects': [
+                {
+                    'id': 'a',
+                    'module': 'a',
+                    'type': 'object',
+                    'features': [],
+                }
+            ]
+        }
+        now = datetime.datetime.now()
+        updated = datetime.datetime.fromisoformat(info_data['updated'])
+        assert (now - updated).seconds == 0
+        assert info_data == expected
