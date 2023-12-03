@@ -7,6 +7,7 @@ def serialize_js_node(node: js_ast.JSNode) -> dict:
     fields = {name: serialize_field(getattr(node, name)) for name in node._fields}
 
     result = {
+        'id': id(node),
         'class': node.__class__.__name__,
     }
     if fields:
@@ -23,16 +24,27 @@ def serialize_field(field_value: Union[str, int, list, js_ast.JSNode]) -> Union[
     return field_value
 
 
-def deserialize_js_node(data: dict) -> js_ast.JSNode:
-    class_name = data.get('class')
-    fields_data = data.get('fields', {})
-    fields = {name: deserialize_field(value) for name, value in fields_data.items()}
-    return js_ast.node_factory(class_name, fields)
+class JSNodeDeserializer:
+    def __init__(self, data: dict):
+        self.data = data
+        self.nodes_by_id = {}
 
+    def deserialize(self):
+        self.nodes_by_id = {}
+        class_name = self.data.get('class')
+        node_id = self.data.get('id')
+        fields_data = self.data.get('fields', {})
+        fields = {name: self.deserialize_field(value) for name, value in fields_data.items()}
+        node = js_ast.node_factory(class_name, fields)
+        self.nodes_by_id[node_id] = node
+        return node
 
-def deserialize_field(value_data: Union[str, int, list, dict]) -> Union[str, int, list, js_ast.JSNode]:
-    if isinstance(value_data, dict):
-        return deserialize_js_node(value_data)
-    elif isinstance(value_data, list):
-        return [deserialize_field(item) for item in value_data]
-    return value_data
+    def deserialize_field(self, value_data: Union[str, int, list, dict]) -> Union[str, int, list, js_ast.JSNode]:
+        if isinstance(value_data, dict):
+            deserializer = JSNodeDeserializer(value_data)
+            node = deserializer.deserialize()
+            self.nodes_by_id.update(deserializer.nodes_by_id)
+            return node
+        elif isinstance(value_data, list):
+            return [self.deserialize_field(item) for item in value_data]
+        return value_data
