@@ -1,7 +1,16 @@
 from typing import Union, Optional
 
+registry = {}
 
-class JSNode:
+
+class JSNodeMeta(type):
+
+    def __init__(self, name, *args) -> None:
+        super().__init__(name, *args)
+        registry[name] = self
+
+
+class JSNode(metaclass=JSNodeMeta):
     _fields = ()
 
     def __init__(self, **kwargs):
@@ -365,3 +374,8 @@ class JSNew(JSExpression):
 
 class JSNop(JSNode):
     pass
+
+
+def node_factory(class_name: str, fields: {}) -> JSNode:
+    node_class = registry.get(class_name)
+    return node_class(**fields)

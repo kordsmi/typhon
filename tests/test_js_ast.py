@@ -17,3 +17,8 @@ def test_eq__error():
 
     expected_message = "assert typhon.js_ast.JSConstant(value=1) == typhon.js_ast.JSConstant(value='2')"
     assert str(e.value) == expected_message
+
+
+def test_node_registry():
+    assert js_ast.registry['JSNode'] == js_ast.JSNode
+    assert js_ast.registry['JSIf'] == js_ast.JSIf
