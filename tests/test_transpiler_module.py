@@ -2,11 +2,13 @@ import copy
 import datetime
 import json
 import os.path
-import zoneinfo
 from tempfile import TemporaryDirectory
 
 from tests.helpers import source_file
 from typhon import js_ast
+from typhon.identifires import ObjectInfo, ID_VAR
+from typhon.js_node_serializer import serialize_js_node
+from typhon.object_info_serializer import serialize_object_info
 from typhon.transpiler_module import ModuleTranspiler, ModuleSource, ModuleFile
 
 
@@ -90,15 +92,59 @@ class TestModuleTranspiler:
         expected = {
             'updated': info_data['updated'],
             'objects': [
-                {
-                    'id': 'a',
-                    'module': 'a',
-                    'type': 'object',
-                    'features': [],
-                }
-            ]
+                serialize_object_info(object_info)
+                for object_info in module_transpiler.globals.values()
+            ],
+            'nodes': serialize_js_node(module_transpiler.js_tree),
         }
         now = datetime.datetime.now()
         updated = datetime.datetime.fromisoformat(info_data['updated'])
         assert (now - updated).seconds == 0
         assert info_data == expected
+
+    def test_import_object_to_globals(self, temp_dir):
+        source_1 = 'from test import a'
+        source_2 = 'a = 123'
+
+        source_file_2 = os.path.join(temp_dir, 'test.py')
+        with source_file(source_file_2, source_2):
+            module_transpiler_2 = ModuleFile(source_file_2, temp_dir)
+            module_transpiler_2.transpile()
+
+        module_transpiler = ModuleSource(source_1, temp_dir)
+        module_transpiler.transpile(related_modules={'test': module_transpiler_2})
+        assert list(module_transpiler.globals.keys()) == ['a']
+        object_info = module_transpiler.globals['a']
+        assert object_info.name == 'a'
+        assert object_info.object_type == ID_VAR
+
+    def test_get_module_info(self):
+        module_transpiler = ModuleTranspiler()
+        node = js_ast.JSName('a')
+        module_transpiler.globals = {
+            'a': ObjectInfo('a', node, ID_VAR),
+        }
+        module_transpiler.js_tree = node
+
+        result = module_transpiler.get_module_info()
+
+        expected = {
+            'updated': datetime.datetime.fromisoformat(result['updated']).isoformat(),
+            'objects': [{'name': 'a', 'node': id(node)}],
+            'nodes': {'id': id(node), 'class': 'JSName', 'fields': {'id': 'a'}},
+        }
+        assert result == expected
+
+    def test_load_info(self):
+        source = 'a = 123'
+        with TemporaryDirectory() as temp_dir:
+            source_filename = os.path.join(temp_dir, 'a.py')
+            with source_file(source_filename, source):
+                module_transpiler = ModuleFile(source_filename, temp_dir)
+                module_transpiler.transpile()
+
+                loaded_module = ModuleFile(source_filename, temp_dir)
+                loaded_module.load_info()
+
+        assert loaded_module.globals == module_transpiler.globals
+        assert loaded_module.js_tree == module_transpiler.js_tree

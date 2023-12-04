@@ -103,3 +103,18 @@ class TestProject:
         assert main_js_path == os.path.join(temp_dir_path, 'main.js')
         assert main_js_code == "export {test};\n\nimport * as test from './test.js';\nprint('test');"
         assert test_js_code == "export {};\n\nprint('Hello!');"
+
+    def test_collect_module_info_on_transpile_importing_modules(self, temp_dir):
+        source_1 = 'import test\nprint("test")'
+        source_2 = 'import foo\nprint("Hello!")'
+        source_3 = 'print("Foo!")'
+
+        project = Project(source_path=temp_dir)
+        source_file_2 = os.path.join(temp_dir, 'test.py')
+        source_file_3 = os.path.join(temp_dir, 'foo.py')
+        with source_file(source_file_2, source_2), source_file(source_file_3, source_3):
+            project.transpile_source(source_1)
+
+        assert list(sorted(project.module_info_list.keys())) == ['foo', 'test']
+        assert project.module_info_list['foo'].module_name == 'foo'
+        assert project.module_info_list['test'].module_name == 'test'

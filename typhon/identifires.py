@@ -52,14 +52,18 @@ def get_object_info(node: js_ast.JSNode, name: Optional[str] = None) -> ObjectIn
 
 
 class ContextObjects:
-    def __init__(self, globals: dict = None, context: dict = None):
+    def __init__(self, globals: dict = None, context: dict = None, scope: str = 'local'):
         self.globals = globals or {}
         self.context = context or {}
         self.locals = {}
+        self.scope = scope
 
     def add(self, node: js_ast.JSNode, name: str = None):
         object_info = get_object_info(node, name)
-        self.locals[object_info.name] = object_info
+        if self.scope == 'global':
+            self.globals[object_info.name] = object_info
+        else:
+            self.locals[object_info.name] = object_info
 
     def get_id_info(self, object_name: str) -> Optional[ObjectInfo]:
         object_info = self.locals.get(object_name)

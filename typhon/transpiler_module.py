@@ -7,6 +7,8 @@ from functools import cached_property
 from typhon import js_ast
 from typhon.generator import generate_js_module
 from typhon.js_analyzer import BodyTransformer
+from typhon.js_node_serializer import serialize_js_node, JSNodeDeserializer
+from typhon.object_info_serializer import serialize_object_info, deserialize_object_info
 from typhon.transpiler import transpile_module
 
 
@@ -17,10 +19,12 @@ class ModuleTranspiler:
         self.ast_dump_name = None
         self.py_tree = None
         self.js_tree = None
-        self.objects = []
+        self.globals = {}
         self.module_name = '__main__'
+        self.related_modules = {}
 
-    def transpile(self):
+    def transpile(self, related_modules: dict = None):
+        self.related_modules = related_modules or {}
         try:
             target_code = self.transpile_module()
         finally:
@@ -59,10 +63,10 @@ class ModuleTranspiler:
         return ''
 
     def transform(self):
-        body_transformer = BodyTransformer(self.js_tree.body)
+        body_transformer = BodyTransformer(self.js_tree.body, scope='global', related_modules=self.related_modules)
         new_body = body_transformer.transform()
-        self.objects = body_transformer.get_identifies()
-        export = js_ast.JSExport(self.objects)
+        self.globals = body_transformer.get_globals()
+        export = js_ast.JSExport(list(self.globals.keys()))
         self.js_tree = js_ast.JSModule(body=new_body or self.js_tree.body, export=export)
 
     @cached_property
@@ -79,20 +83,37 @@ class ModuleTranspiler:
 
     def save_info(self):
         json_info_file = os.path.join(self.cache_directory, f'{self.module_name}.json')
-        objects = []
-        for object_name in self.objects:
-            objects.append({
-                'id': object_name,
-                'module': self.module_name,
-                'type': 'object',
-                'features': [],
-            })
-        info = {
-            'updated': datetime.datetime.now().isoformat(),
-            'objects': objects
-        }
+        info = self.get_module_info()
         with open(json_info_file, 'w') as f:
             json.dump(info, f)
+
+    def get_module_info(self) -> dict:
+        objects = []
+        for name, object_info in self.globals.items():
+            objects.append(serialize_object_info(object_info))
+        return {
+            'updated': datetime.datetime.now().isoformat(),
+            'objects': objects,
+            'nodes': serialize_js_node(self.js_tree),
+        }
+
+    def load_info(self):
+        json_info_file = os.path.join(self.cache_directory, f'{self.module_name}.json')
+        with open(json_info_file, 'r') as f:
+            info_data = json.load(f)
+
+        self.update_from_loaded_info(info_data)
+
+    def update_from_loaded_info(self, info_data: dict):
+        objects = info_data.get('objects')
+        nodes_info = info_data.get('nodes', {})
+        node_deserializer = JSNodeDeserializer(nodes_info)
+        self.js_tree = node_deserializer.deserialize()
+
+        self.globals = {}
+        for object_data in objects:
+            object_info = deserialize_object_info(object_data, node_deserializer.nodes_by_ids)
+            self.globals[object_info.name] = object_info
 
 
 class ModuleFile(ModuleTranspiler):

@@ -6,6 +6,7 @@ class Project:
     def __init__(self, source_path: str = None):
         self.import_graph = {}
         self.source_path = source_path or '.'
+        self.module_info_list = {}
 
     def transpile_source(self, source: str) -> str:
         """
@@ -54,4 +55,10 @@ class Project:
     def transpile_module(self, module_name):
         module_file = module_name + '.py'
         module = ModuleFile(module_file, source_path=self.source_path)
-        return module.transpile()
+        related_modules = {}
+        module_imports = self.import_graph.get(module_name, [])
+        for imported_module_name in module_imports:
+            related_modules[imported_module_name] = self.module_info_list[imported_module_name]
+        result = module.transpile(related_modules)
+        self.module_info_list[module_name] = module
+        return result

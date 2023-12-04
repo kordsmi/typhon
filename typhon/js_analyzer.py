@@ -19,14 +19,20 @@ class BodyTransformer(JSNodeVisitor):
             body: [js_ast.JSStatement],
             global_ids: dict = None,
             context_ids: dict = None,
+            scope: str = 'local',
+            related_modules: dict = None,
     ):
         self.body = body
         self.call_list = defaultdict(list)
         self.alias_list = defaultdict(list)
-        self.ids = ContextObjects(global_ids, context_ids)
+        self.ids = ContextObjects(global_ids, context_ids, scope=scope)
+        self.related_modules = related_modules or {}
 
     def get_identifies(self):
         return self.ids.get_id_list()
+
+    def get_globals(self):
+        return self.ids.globals
 
     def transform(self):
         new_body = self.visit(self.body)
@@ -102,12 +108,21 @@ class BodyTransformer(JSNodeVisitor):
             self.call_list[func.id].append(NodeInfo(node, -1))
 
     def _add_import_info(self, node: js_ast.JSImport):
+        module_name = node.alias or node.module
+
         if node.names:
+            # Добавление импортируемых объектов
             for alias in node.names:
                 object_name = alias.asname or alias.name
-                self.ids.add(node, object_name)
+                module_info = self.related_modules.get(module_name)
+                if module_info and object_name in module_info.globals:
+                    object_info = module_info.globals[object_name]
+                    self.ids.add(object_info.node, object_name)
+                else:
+                    self.ids.add(node, object_name)
         else:
-            object_name = node.alias or node.module
+            # Добавление модуля как объекта
+            object_name = module_name
             self.ids.add(node, object_name)
 
     def _check_and_transform_call_to_new(self, node: js_ast.JSCall) -> Optional[js_ast.JSNew]:
