@@ -1,16 +1,9 @@
 from collections import defaultdict
-from dataclasses import dataclass
 from typing import Optional
 
 from typhon import js_ast
-from typhon.identifires import ContextObjects, ID_CLASS
+from typhon.identifires import ContextObjects, ID_CLASS, get_object_info
 from typhon.js_visitor import JSNodeVisitor
-
-
-@dataclass
-class NodeInfo:
-    node: js_ast.JSNode
-    index: int
 
 
 class BodyTransformer(JSNodeVisitor):
@@ -64,7 +57,7 @@ class BodyTransformer(JSNodeVisitor):
             return
 
         if target.attr == '__ty_alias__':
-            self.alias_list[target.value.id].append(NodeInfo(node, -1))
+            self.alias_list[target.value.id].append(get_object_info(node))
             return js_ast.JSNop()
 
     def visit_JSName(self, node: js_ast.JSName) -> Optional[js_ast.JSName]:
@@ -105,7 +98,7 @@ class BodyTransformer(JSNodeVisitor):
     def _add_call_info(self, node: js_ast.JSCall):
         func: js_ast.JSExpression = node.func
         if isinstance(func, js_ast.JSName):
-            self.call_list[func.id].append(NodeInfo(node, -1))
+            self.call_list[func.id].append(get_object_info(node))
 
     def _add_import_info(self, node: js_ast.JSImport):
         module_name = node.alias or node.module
@@ -153,7 +146,7 @@ class ClassTransformer(JSNodeVisitor):
         new_args = self.visit(node.args)
         body_transformer = BodyTransformer(node.body)
         body_transformer.alias_list['self'].append(
-            NodeInfo(js_ast.JSAssign(js_ast.JSName('self'), js_ast.JSConstant('this')), -1)
+            get_object_info(js_ast.JSAssign(js_ast.JSName('self'), js_ast.JSConstant('this')))
         )
         new_body = body_transformer.transform()
         return js_ast.JSMethodDef(name=method_name, args=new_args or node.args, body=new_body or node.body)

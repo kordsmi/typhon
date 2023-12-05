@@ -9,6 +9,11 @@ ID_VAR = 'var'
 ID_CLASS = 'class'
 ID_FUNCTION = 'function'
 ID_IMPORT = 'import'
+ID_CALL = 'call'
+
+
+class NoName:
+    pass
 
 
 @dataclass
@@ -28,6 +33,8 @@ def get_object_name_and_type(node):
         target = node.target
         if isinstance(target, js_ast.JSName):
             name = target.id
+        elif isinstance(target, js_ast.JSAttribute):
+            name = NoName
         id_type = ID_VAR
     elif isinstance(node, js_ast.JSClassDef):
         name = node.name
@@ -37,6 +44,9 @@ def get_object_name_and_type(node):
         id_type = ID_FUNCTION
     elif isinstance(node, js_ast.JSImport):
         id_type = ID_IMPORT
+    elif isinstance(node, js_ast.JSCall):
+        name = node.func
+        id_type = ID_CALL
     else:
         raise UnsupportedNode(f'Cannot add unsupported node {node.__class__} to identifiers')
     return id_type, name

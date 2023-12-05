@@ -1,7 +1,8 @@
 import ast
 
 from typhon import js_ast
-from typhon.js_analyzer import BodyTransformer, NodeInfo, ClassTransformer
+from typhon.identifires import ObjectInfo, ID_VAR, NoName
+from typhon.js_analyzer import BodyTransformer, ClassTransformer
 from typhon.transpiler import transpile_module
 
 
@@ -76,8 +77,10 @@ def test_replace_in_body__replace_call_args():
     ]
 
     body_transformer = BodyTransformer(body)
-    body_transformer.alias_list['b'].append(NodeInfo(
-        js_ast.JSAssign(target=js_ast.JSName('b'), value=js_ast.JSConstant('foo')), -1,
+    body_transformer.alias_list['b'].append(ObjectInfo(
+        'b',
+        js_ast.JSAssign(target=js_ast.JSName('b'), value=js_ast.JSConstant('foo')),
+        ID_VAR,
     ))
     result = body_transformer.transform()
 
@@ -104,9 +107,10 @@ class TestBodyTransformer:
         body_transformer.transform()
 
         assert list(body_transformer.alias_list.keys()) == ['a']
-        assert body_transformer.alias_list['a'] == [NodeInfo(
+        assert body_transformer.alias_list['a'] == [ObjectInfo(
+            NoName,
             node=js_ast.JSAssign(js_ast.JSAttribute(js_ast.JSName('a'), '__ty_alias__'), js_ast.JSConstant('b')),
-            index=-1
+            object_type=ID_VAR,
         )]
 
     def test_rename_variables_to_aliases(self):
