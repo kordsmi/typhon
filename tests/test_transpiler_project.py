@@ -115,6 +115,6 @@ class TestProject:
         with source_file(source_file_2, source_2), source_file(source_file_3, source_3):
             project.transpile_source(source_1)
 
-        assert list(sorted(project.module_info_list.keys())) == ['foo', 'test']
-        assert project.module_info_list['foo'].module_name == 'foo'
-        assert project.module_info_list['test'].module_name == 'test'
+        assert list(sorted(project.module_info_list.keys())) == ['__main__', 'foo', 'test']
+        assert project.module_info_list['foo'].objects == {}
+        assert list(project.module_info_list['test'].objects.keys()) == ['foo']

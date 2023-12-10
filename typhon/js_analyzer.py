@@ -108,8 +108,8 @@ class BodyTransformer(JSNodeVisitor):
             for alias in node.names:
                 object_name = alias.asname or alias.name
                 module_info = self.related_modules.get(module_name)
-                if module_info and object_name in module_info.globals:
-                    object_info = module_info.globals[object_name]
+                if module_info and object_name in module_info.objects:
+                    object_info = module_info.objects[object_name]
                     self.ids.add(object_info.node, object_name)
                 else:
                     self.ids.add(node, object_name)
