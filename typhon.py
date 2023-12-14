@@ -1,6 +1,6 @@
 import sys
 
-from typhon.transpiler_project import Project
+from typhon.project import Project
 
 
 def main():

@@ -1,6 +1,7 @@
 from typhon.import_graph import ImportGraph
 from typhon.module_info import ModuleInfo
-from typhon.transpiler_module import ModuleFile, ModuleSource, Transpiler, Module
+from typhon.module_tools import Module, ModuleFile, ModuleSource
+from typhon.module_transpiler import ModuleTranspiler
 
 
 class Project:
@@ -58,7 +59,7 @@ class Project:
     def transpile_module(self, module: Module):
         related_modules = self.get_related_modules(module.module_name)
 
-        transpiler = Transpiler(module.get_source(), related_modules)
+        transpiler = ModuleTranspiler(module.get_source(), related_modules)
         try:
             target_code = transpiler.transpile()
         finally:

@@ -3,7 +3,7 @@ from _ast import Import, AST
 from typing import Any
 
 from typhon.exceptions import TyphonImportError
-from typhon.transpiler_module import ModuleFile
+from typhon.module_tools import ModuleFile
 
 
 class ImportCollector(ast.NodeVisitor):

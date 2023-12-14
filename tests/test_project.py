@@ -2,7 +2,7 @@ import os.path
 from tempfile import TemporaryDirectory
 
 from tests.helpers import source_file
-from typhon.transpiler_project import Project
+from typhon.project import Project
 
 
 class TestProject:
