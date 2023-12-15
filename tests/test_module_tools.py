@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 
 from typhon.js_node_serializer import serialize_js_node
 from typhon.module_info import ModuleInfo
-from typhon.module_tools import ModuleSource, ModuleFile
+from typhon.module_tools import Module
 from typhon.object_info_serializer import serialize_object_info
 from typhon.module_transpiler import ModuleTranspiler
 
@@ -14,7 +14,7 @@ class TestModule:
     def test_cache_directory(self):
         source = 'print(a)'
         with TemporaryDirectory() as temp_dir:
-            module = ModuleSource(source, temp_dir)
+            module = Module(source_path=temp_dir)
             transpiler = ModuleTranspiler(source)
             transpiler.transpile()
             module_info = ModuleInfo(objects=transpiler.globals, js_tree=transpiler.js_tree)
@@ -30,7 +30,7 @@ class TestModule:
         source = 'a = 123'
         with TemporaryDirectory() as temp_dir:
             source_filename = os.path.join(temp_dir, 'a.py')
-            module = ModuleFile(source_filename, temp_dir)
+            module = Module('a', source_path=temp_dir)
 
             transpiler = ModuleTranspiler(source)
             transpiler.transpile()
@@ -59,15 +59,14 @@ class TestModule:
     def test_load_info(self):
         source = 'a = 123'
         with TemporaryDirectory() as temp_dir:
-            source_filename = os.path.join(temp_dir, 'a.py')
-            module = ModuleFile(source_filename, temp_dir)
+            module = Module('a', source_path=temp_dir)
 
             transpiler = ModuleTranspiler(source)
             transpiler.transpile()
             module_info = ModuleInfo(objects=transpiler.globals, js_tree=transpiler.js_tree)
             module.save_info(module_info)
 
-            loaded_module = ModuleFile(source_filename, temp_dir)
+            loaded_module = Module('a', source_path=temp_dir)
             loaded_module_info = loaded_module.load_info()
 
         assert loaded_module_info.objects == module_info.objects

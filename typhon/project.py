@@ -1,6 +1,8 @@
+import os.path
+
 from typhon.import_graph import ImportGraph
 from typhon.module_info import ModuleInfo
-from typhon.module_tools import Module, ModuleFile, ModuleSource
+from typhon.module_tools import Module, get_module_from_file
 from typhon.module_transpiler import ModuleTranspiler
 
 
@@ -15,8 +17,8 @@ class Project:
         Транспиляция переданного исходного кода. В ответе возвращается js-код.
         """
         self.transpile_related_modules(source)
-        module = ModuleSource(source, source_path=self.source_path)
-        return self.transpile_module(module)
+        module = Module(source_path=self.source_path)
+        return self.transpile_module(module, source)
 
     def transpile_related_modules(self, source: str):
         self.get_import_graph(source)
@@ -25,7 +27,7 @@ class Project:
             if module_name == '__main__':
                 continue
             module_file = module_name + '.py'
-            module = ModuleFile(module_file, source_path=self.source_path)
+            module = get_module_from_file(os.path.join(self.source_path, module_file))
             self.transpile_module(module)
 
     def get_import_graph(self, source: str):
@@ -36,7 +38,7 @@ class Project:
         """
         Транспиляция файла с исходным кодом. В ответ возвращается путь к оттранспилированному js-файлу.
         """
-        module = ModuleFile(source_file_path, source_path=self.source_path)
+        module = get_module_from_file(source_file_path)
         self.transpile_related_modules(module.get_source())
         self.transpile_module(module)
         return module.target_file_name
@@ -56,10 +58,10 @@ class Project:
         add_modules('__main__')
         return result
 
-    def transpile_module(self, module: Module):
+    def transpile_module(self, module: Module, source: str = None):
         related_modules = self.get_related_modules(module.module_name)
 
-        transpiler = ModuleTranspiler(module.get_source(), related_modules)
+        transpiler = ModuleTranspiler(source or module.get_source(), related_modules)
         try:
             target_code = transpiler.transpile()
         finally:

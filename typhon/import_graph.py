@@ -1,9 +1,10 @@
 import ast
+import os.path
 from _ast import Import, AST
 from typing import Any
 
 from typhon.exceptions import TyphonImportError
-from typhon.module_tools import ModuleFile
+from typhon.module_tools import get_module_from_file
 
 
 class ImportCollector(ast.NodeVisitor):
@@ -55,7 +56,7 @@ class ImportGraph:
 
     def get_module_source(self, module_name):
         module_path = module_name + '.py'
-        module = ModuleFile(module_path, source_path=self.source_path)
+        module = get_module_from_file(os.path.join(self.source_path, module_path))
         source = module.get_source()
         return source
 

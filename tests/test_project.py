@@ -18,9 +18,9 @@ class TestProject:
     def test_transpile_file(self):
         py_str = 'print(1 + 2)'
         js_str = 'export {};\n\nprint(1 + 2);'
-        project = Project()
 
         with TemporaryDirectory() as temp_dir_path:
+            project = Project(source_path=temp_dir_path)
             file_path = os.path.join(temp_dir_path, 'test.py')
             js_path = os.path.join(temp_dir_path, 'test.js')
             with open(file_path, 'w') as f:

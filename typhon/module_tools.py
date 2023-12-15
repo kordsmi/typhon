@@ -7,33 +7,26 @@ from typhon.module_info import ModuleInfo, serialize_module_info, deserialize_mo
 
 
 class Module:
-    def __init__(self, source_path: str = None):
-        self.source_path = source_path
-        self.target_file_name = None
-        self.ast_dump_name = None
-        self.module_name = '__main__'
+    def __init__(self, module_name: str = None, source_path: str = None):
+        self.source_path = source_path or '.'
+        self.module_name = module_name or '__main__'
 
     def save_js(self, target_code):
-        if not self.target_file_name:
-            return
-
-        target_file_name = os.path.join(self.source_path, self.target_file_name)
-        with open(target_file_name, 'w') as f:
+        with open(self.target_file_name, 'w') as f:
             f.write(target_code)
 
     def dump_ast(self, py_tree: ast.AST):
         if not py_tree:
             return
 
-        if not self.ast_dump_name:
-            return
-
-        ast_dump_file = os.path.join(self.source_path, self.ast_dump_name)
-        with open(ast_dump_file, 'w') as f:
+        with open(self.ast_dump_file_name, 'w') as f:
             f.write(ast.dump(py_tree, indent=2))
 
     def get_source(self):
-        return ''
+        filename = os.path.join(self.source_path, f'{self.module_name}.py')
+        with open(filename, 'r') as f:
+            source_code = f.read()
+        return source_code
 
     @cached_property
     def cache_directory(self):
@@ -46,6 +39,14 @@ class Module:
             f.write('*')
 
         return cache_directory
+
+    @property
+    def target_file_name(self):
+        return os.path.join(self.source_path, f'{self.module_name}.js')
+
+    @property
+    def ast_dump_file_name(self):
+        return os.path.join(self.cache_directory, f'{self.module_name}_ast.txt')
 
     def save_info(self, module_info: ModuleInfo):
         json_info_file = os.path.join(self.cache_directory, f'{self.module_name}.json')
@@ -61,26 +62,8 @@ class Module:
         return deserialize_module_info(info_data)
 
 
-class ModuleFile(Module):
-    def __init__(self, source_file_path: str, source_path: str = None):
-        super().__init__(source_path)
-        self.source_file_path = source_file_path
-        file_name, ext = os.path.splitext(source_file_path)
-        self.target_file_name = f'{file_name}.js'
-        self.ast_dump_name = f'{file_name}_ast.txt'
-        self.module_name = os.path.basename(file_name)
-
-    def get_source(self):
-        source_file_path = os.path.join(self.source_path, self.source_file_path)
-        with open(source_file_path, 'r') as f:
-            source_code = f.read()
-        return source_code
-
-
-class ModuleSource(Module):
-    def __init__(self, source: str, source_path: str = None):
-        super().__init__(source_path)
-        self.source = source
-
-    def get_source(self):
-        return self.source
+def get_module_from_file(source_file_path: str):
+    source_path, filename = os.path.split(source_file_path)
+    filename, ext = os.path.splitext(filename)
+    module = Module(module_name=filename, source_path=source_path)
+    return module
