@@ -62,7 +62,7 @@ class Module:
         return deserialize_module_info(info_data)
 
 
-def get_module_from_file(source_file_path: str):
+def get_module_from_file(source_file_path: str) -> Module:
     source_path, filename = os.path.split(source_file_path)
     filename, ext = os.path.splitext(filename)
     module = Module(module_name=filename, source_path=source_path)

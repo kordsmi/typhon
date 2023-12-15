@@ -1,10 +1,9 @@
 import ast
-import os.path
 from _ast import Import, AST
 from typing import Any
 
 from typhon.exceptions import TyphonImportError
-from typhon.module_tools import get_module_from_file
+from typhon.module_tools import Module
 
 
 class ImportCollector(ast.NodeVisitor):
@@ -55,10 +54,8 @@ class ImportGraph:
         return self.graph
 
     def get_module_source(self, module_name):
-        module_path = module_name + '.py'
-        module = get_module_from_file(os.path.join(self.source_path, module_path))
-        source = module.get_source()
-        return source
+        module = Module(module_name, self.source_path)
+        return module.get_source()
 
     def get_imports_and_add_to_queue(self, module_name, source):
         imports = self.get_imports(source)

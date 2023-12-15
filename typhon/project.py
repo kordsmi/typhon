@@ -1,5 +1,3 @@
-import os.path
-
 from typhon.import_graph import ImportGraph
 from typhon.module_info import ModuleInfo
 from typhon.module_tools import Module, get_module_from_file
@@ -26,8 +24,7 @@ class Project:
         for module_name in modules:
             if module_name == '__main__':
                 continue
-            module_file = module_name + '.py'
-            module = get_module_from_file(os.path.join(self.source_path, module_file))
+            module = Module(module_name, self.source_path)
             self.transpile_module(module)
 
     def get_import_graph(self, source: str):
