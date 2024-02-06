@@ -3,6 +3,7 @@ import json
 import os.path
 from tempfile import TemporaryDirectory
 
+from typhon.object_info import ObjectInfo
 from typhon.js_node_serializer import serialize_js_node
 from typhon.module_info import ModuleInfo
 from typhon.module_tools import Module
@@ -15,9 +16,10 @@ class TestModule:
         source = 'print(a)'
         with TemporaryDirectory() as temp_dir:
             module = Module(source_path=temp_dir)
-            transpiler = ModuleTranspiler(source)
+            root_object = ObjectInfo(None)
+            transpiler = ModuleTranspiler(source, root_object, 'test')
             transpiler.transpile()
-            module_info = ModuleInfo(objects=transpiler.globals, js_tree=transpiler.js_tree)
+            module_info = ModuleInfo(objects=root_object, js_tree=transpiler.js_tree)
             module.save_info(module_info)
 
             cache_directory = os.path.join(temp_dir, '.ty_cache')
@@ -32,9 +34,10 @@ class TestModule:
             source_filename = os.path.join(temp_dir, 'a.py')
             module = Module('a', source_path=temp_dir)
 
-            transpiler = ModuleTranspiler(source)
+            root_object = ObjectInfo(None)
+            transpiler = ModuleTranspiler(source, root_object, 'test')
             transpiler.transpile()
-            module_info = ModuleInfo(objects=transpiler.globals, js_tree=transpiler.js_tree)
+            module_info = ModuleInfo(objects=root_object, js_tree=transpiler.js_tree)
             module.save_info(module_info)
 
             cache_directory = os.path.join(temp_dir, '.ty_cache')
@@ -45,10 +48,7 @@ class TestModule:
         info_data = json.loads(info_json_data)
         expected = {
             'updated': info_data['updated'],
-            'objects': [
-                serialize_object_info(object_info)
-                for object_info in module_info.objects.values()
-            ],
+            'objects': serialize_object_info(module_info.objects),
             'nodes': serialize_js_node(module_info.js_tree),
         }
         now = datetime.datetime.now()
@@ -61,9 +61,10 @@ class TestModule:
         with TemporaryDirectory() as temp_dir:
             module = Module('a', source_path=temp_dir)
 
-            transpiler = ModuleTranspiler(source)
+            root_object = ObjectInfo(None)
+            transpiler = ModuleTranspiler(source, root_object, 'test')
             transpiler.transpile()
-            module_info = ModuleInfo(objects=transpiler.globals, js_tree=transpiler.js_tree)
+            module_info = ModuleInfo(objects=root_object, js_tree=transpiler.js_tree)
             module.save_info(module_info)
 
             loaded_module = Module('a', source_path=temp_dir)

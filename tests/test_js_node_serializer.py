@@ -60,7 +60,6 @@ class TestDeserializeJSNode:
         result = deserializer.deserialize()
 
         assert result == node
-        assert deserializer.nodes_by_ids == {id(node): node}
 
     def test_name(self):
         node = js_ast.JSName(id='var_a')
@@ -70,7 +69,6 @@ class TestDeserializeJSNode:
         result = deserializer.deserialize()
 
         assert result == node
-        assert deserializer.nodes_by_ids == {id(node): node}
 
     def test_list(self):
         node = js_ast.JSList(
@@ -85,8 +83,6 @@ class TestDeserializeJSNode:
         result = deserializer.deserialize()
 
         assert result == node
-        nodes_by_ids = {id(node): node, id(node.elts[0]): node.elts[0], id(node.elts[1]): node.elts[1]}
-        assert deserializer.nodes_by_ids == nodes_by_ids
 
     def test_assign(self):
         node = js_ast.JSAssign(target=js_ast.JSName('test'), value=js_ast.JSConstant(123))
@@ -96,5 +92,3 @@ class TestDeserializeJSNode:
         result = deserializer.deserialize()
 
         assert result == node
-        nodes_by_ids = {id(node): node, id(node.target): node.target, id(node.value): node.value}
-        assert deserializer.nodes_by_ids == nodes_by_ids

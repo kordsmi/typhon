@@ -2,6 +2,7 @@ import os.path
 from tempfile import TemporaryDirectory
 
 from tests.helpers import source_file
+from typhon.object_info import ModuleObjectInfo
 from typhon.project import Project
 
 
@@ -116,5 +117,5 @@ class TestProject:
             project.transpile_source(source_1)
 
         assert list(sorted(project.module_info_list.keys())) == ['__main__', 'foo', 'test']
-        assert project.module_info_list['foo'].objects == {}
-        assert list(project.module_info_list['test'].objects.keys()) == ['foo']
+        assert project.module_info_list['foo'].objects == ModuleObjectInfo(['foo'], 'foo')
+        assert list(project.module_info_list['test'].objects.object_dict.keys()) == ['foo']

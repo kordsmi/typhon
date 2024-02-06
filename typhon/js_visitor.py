@@ -1,5 +1,5 @@
 import typing
-from typing import Optional, List
+from typing import Optional, List, Union
 
 from typhon import js_ast
 
@@ -18,7 +18,7 @@ def _or(item1, item2) -> typing.Any:
 
 
 class JSNodeVisitor:
-    def visit(self, node: js_ast.JSNode) -> Optional[js_ast.JSNode] | List[js_ast.JSNode]:
+    def visit(self, node: js_ast.JSNode) -> Optional[Union[js_ast.JSNode, List[js_ast.JSNode]]]:
         if isinstance(node, list):
             return self.visit_list(node)
 

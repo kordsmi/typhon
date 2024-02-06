@@ -72,7 +72,7 @@ class JSConstant(JSExpression):
         'value',
     )
 
-    def __init__(self, value: str | int):
+    def __init__(self, value: Union[str, int]):
         super().__init__(value=value)
 
 

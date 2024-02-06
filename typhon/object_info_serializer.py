@@ -1,19 +1,43 @@
-from typing import Dict
+import copy
+from typing import List
 
-from typhon import js_ast
-from typhon.identifires import ObjectInfo, get_object_info
+from typhon.context import get_context_object
+from typhon.object_info import ObjectInfo, registry
 
 
-def serialize_object_info(object_info: ObjectInfo) -> dict:
-    return {
-        'name': object_info.name,
-        'node': id(object_info.node),
+def serialize_object_info(root_object: ObjectInfo, context_path: List[str] = None) -> dict:
+    context_path = context_path or []
+    object_info = get_context_object(root_object, context_path)
+
+    data = {
+        'class': object_info.__class__.__name__,
     }
 
+    for field_key in object_info._fields:
+        if field_key == 'node':
+            continue
+        data[field_key] = getattr(object_info, field_key)
 
-def deserialize_object_info(data: dict, nodes_by_ids: Dict[str, js_ast.JSNode]) -> ObjectInfo:
-    object_id = data.get('node')
-    name = data.get('name')
-    node = nodes_by_ids.get(object_id)
-    if node:
-        return get_object_info(node, name)
+    data['object_dict'] = {}
+    for key in object_info.object_dict:
+        data['object_dict'][key] = serialize_object_info(root_object, context_path + [key])
+
+    return data
+
+
+def deserialize_object_info(data: dict) -> ObjectInfo:
+    data = copy.copy(data)
+    class_name = data.pop('class')
+    cls = registry[class_name]
+    object_class = data.pop('object_class')
+    object_dict_data = data.pop('object_dict')
+
+    object_info: ObjectInfo = cls(**data)
+    object_info.object_class = object_class
+
+    object_dict = {}
+    for key, data in object_dict_data.items():
+        object_dict[key] = deserialize_object_info(data)
+    object_info.object_dict = object_dict
+
+    return object_info

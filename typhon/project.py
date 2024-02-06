@@ -1,3 +1,4 @@
+from typhon.object_info import ObjectInfo
 from typhon.import_graph import ImportGraph
 from typhon.module_info import ModuleInfo
 from typhon.module_tools import Module, get_module_from_file
@@ -9,6 +10,7 @@ class Project:
         self.import_graph = {}
         self.source_path = source_path or '.'
         self.module_info_list = {}
+        self.root_object = ObjectInfo(None)
 
     def transpile_source(self, source: str) -> str:
         """
@@ -56,15 +58,13 @@ class Project:
         return result
 
     def transpile_module(self, module: Module, source: str = None):
-        related_modules = self.get_related_modules(module.module_name)
-
-        transpiler = ModuleTranspiler(source or module.get_source(), related_modules)
+        transpiler = ModuleTranspiler(source or module.get_source(), self.root_object, module.module_name)
         try:
             target_code = transpiler.transpile()
         finally:
             module.dump_ast(transpiler.py_tree)
 
-        module_info = ModuleInfo(objects=transpiler.globals, js_tree=transpiler.js_tree)
+        module_info = ModuleInfo(objects=transpiler.module_object, js_tree=transpiler.js_tree)
         module.save_js(target_code)
         module.save_info(module_info)
 

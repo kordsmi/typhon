@@ -1,20 +1,21 @@
 import ast
-from typing import Dict
 
 from typhon import js_ast
 from typhon.generator import generate_js_module
+from typhon.object_info import ObjectInfo, ModuleObjectInfo
 from typhon.js_analyzer import BodyTransformer
-from typhon.module_info import ModuleInfo
 from typhon.transpiler import transpile_module
 
 
 class ModuleTranspiler:
-    def __init__(self, source: str, related_modules: Dict[str, ModuleInfo] = None):
+    def __init__(self, source: str, root_object: ObjectInfo, module_name: str):
         self.source = source
-        self.related_modules = related_modules or {}
         self.py_tree = None
         self.js_tree = None
-        self.globals = {}
+        self.name = module_name
+        self.root_object = root_object
+        root_object.object_dict[self.name] = ModuleObjectInfo([self.name], self.name)
+        self.module_object: ModuleObjectInfo = root_object.object_dict[self.name]
 
     def transpile(self) -> str:
         self.py_tree = ast.parse(self.source)
@@ -23,8 +24,7 @@ class ModuleTranspiler:
         return generate_js_module(self.js_tree)
 
     def transform(self):
-        body_transformer = BodyTransformer(self.js_tree.body, scope='global', related_modules=self.related_modules)
+        body_transformer = BodyTransformer(self.js_tree.body, [self.name], self.root_object)
         new_body = body_transformer.transform()
-        self.globals = body_transformer.get_globals()
-        export = js_ast.JSExport(list(self.globals.keys()))
+        export = js_ast.JSExport(list(self.module_object.object_dict))
         self.js_tree = js_ast.JSModule(body=new_body or self.js_tree.body, export=export)
