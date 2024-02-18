@@ -52,7 +52,7 @@ class Module:
         json_info_file = os.path.join(self.cache_directory, f'{self.module_name}.json')
         module_info_data = serialize_module_info(module_info)
         with open(json_info_file, 'w') as f:
-            json.dump(module_info_data, f)
+            json.dump(module_info_data, f, indent=4)
 
     def load_info(self):
         json_info_file = os.path.join(self.cache_directory, f'{self.module_name}.json')

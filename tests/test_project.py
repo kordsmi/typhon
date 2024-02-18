@@ -117,5 +117,5 @@ class TestProject:
             project.transpile_source(source_1)
 
         assert list(sorted(project.module_info_list.keys())) == ['__main__', 'foo', 'test']
-        assert project.module_info_list['foo'].objects == ModuleObjectInfo(['foo'], 'foo')
-        assert list(project.module_info_list['test'].objects.object_dict.keys()) == ['foo']
+        assert list(project.module_info_list['foo'].objects.object_dict.keys()) == ['__special__']
+        assert list(project.module_info_list['test'].objects.object_dict.keys()) == ['__special__', 'foo']

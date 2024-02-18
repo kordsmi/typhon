@@ -5,7 +5,7 @@ from typhon.object_info import ObjectInfo, ModuleObjectInfo, ConstantObjectInfo
 from typhon.module_transpiler import ModuleTranspiler
 
 
-class TestTranspiler:
+class TestModuleTranspiler:
     def setup_method(self, test_method):
         self.root_object = ObjectInfo(None)
 
@@ -14,6 +14,13 @@ class TestTranspiler:
         transpiler.js_tree = js_tree
         transpiler.transform()
         return transpiler.js_tree
+
+    def test_base(self):
+        ModuleTranspiler(None, self.root_object, '__main__')
+        special_info = self.root_object.object_dict['__main__'].object_dict['__special__']
+        assert isinstance(special_info, ModuleObjectInfo)
+        assert special_info.context_path == ['__main__', '__special__']
+        assert special_info.file == '__special__.py'
 
     def test_transform(self):
         js_module = js_ast.JSModule(body=[
@@ -51,10 +58,9 @@ class TestTranspiler:
         js_module = self.transform(js_module)
 
         assert js_module.export == js_ast.JSExport(['var_a', 'foo'])
-        assert self.root_object.object_dict['__main__'].object_dict == {
-            'var_a': module_object.object_dict['a'],
-            'foo': module_object.object_dict['foo'],
-        }
+        assert list(self.root_object.object_dict['__main__'].object_dict.keys()) == [
+            '__special__', 'var_a', 'foo',
+        ]
 
     def test_transform__export_imports__all(self):
         module_object = ModuleObjectInfo('test', 'test')
@@ -62,9 +68,9 @@ class TestTranspiler:
         js_module = js_ast.JSModule(body=[js_ast.JSImport('test', names=[])])
         js_module = self.transform(js_module)
         assert js_module.export == js_ast.JSExport(['test'])
-        assert self.root_object.object_dict['__main__'].object_dict == {
-            'test': module_object,
-        }
+        assert list(self.root_object.object_dict['__main__'].object_dict.keys()) == [
+            '__special__', 'test',
+        ]
 
     def test_transform__export_class_names(self):
         js_module = js_ast.JSModule(body=[js_ast.JSClassDef(name='TestClass', body=[])])
@@ -81,7 +87,12 @@ class TestTranspiler:
         transpiler = ModuleTranspiler(source_1, self.root_object, '__main__')
         transpiler.transpile()
 
-        assert list(transpiler.module_object.object_dict.keys()) == ['a']
+        assert list(transpiler.module_object.object_dict.keys()) == ['__special__', 'a']
         object_info = transpiler.module_object.object_dict['a']
         assert isinstance(object_info, ConstantObjectInfo)
         assert object_info.value == 123
+
+    def test_special_module(self):
+        """ Для модуля __special__ не нужно подключать модуль __special__ (самого себя) """
+        ModuleTranspiler(None, self.root_object, '__special__')
+        assert self.root_object.object_dict['__special__'].object_dict == {}

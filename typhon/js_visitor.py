@@ -127,3 +127,8 @@ class JSNodeVisitor:
         new_value = self.visit(node.value)
         if new_value:
             return js_ast.JSKeyWord(arg=node.arg, value=_or(new_value, node.value))
+
+    def visit_JSReturn(self, node: js_ast.JSReturn) -> Optional[js_ast.JSReturn]:
+        new_value = self.visit(node.value)
+        if new_value:
+            return js_ast.JSReturn(new_value)

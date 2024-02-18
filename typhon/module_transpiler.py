@@ -16,6 +16,9 @@ class ModuleTranspiler:
         self.root_object = root_object
         root_object.object_dict[self.name] = ModuleObjectInfo([self.name], self.name)
         self.module_object: ModuleObjectInfo = root_object.object_dict[self.name]
+        if self.name != '__special__':
+            special_module_info = ModuleObjectInfo([self.name, '__special__'], '__special__.py')
+            self.module_object.object_dict['__special__'] = special_module_info
 
     def transpile(self) -> str:
         self.py_tree = ast.parse(self.source)
@@ -26,5 +29,5 @@ class ModuleTranspiler:
     def transform(self):
         body_transformer = BodyTransformer(self.js_tree.body, [self.name], self.root_object)
         new_body = body_transformer.transform()
-        export = js_ast.JSExport(list(self.module_object.object_dict))
+        export = js_ast.JSExport([module for module in self.module_object.object_dict if module != '__special__'])
         self.js_tree = js_ast.JSModule(body=new_body or self.js_tree.body, export=export)
