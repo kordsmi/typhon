@@ -80,6 +80,4 @@ class TestSerializeDeserializeObjectInfo:
         assert result == expected
 
         deserialized_object = deserialize_object_info(result)
-        print(deserialized_object.object_dict)
-        print(root_object.object_dict)
         assert deserialized_object == root_object

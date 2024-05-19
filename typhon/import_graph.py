@@ -3,7 +3,9 @@ from _ast import Import, AST
 from typing import Any
 
 from typhon.exceptions import TyphonImportError
-from typhon.module_tools import Module
+from typhon.module import Module
+from typhon.source_manager import SourceManager
+from typhon.types import ModulePath
 
 
 class ImportCollector(ast.NodeVisitor):
@@ -14,7 +16,7 @@ class ImportCollector(ast.NodeVisitor):
     def visit_Import(self, node: Import) -> Any:
         names: [ast.alias] = node.names
         for name in names:
-            self.imports.append(name.name)
+            self.imports.append(ModulePath('', name.name))
 
     def generic_visit(self, node: AST) -> Any:
         for field, value in ast.iter_fields(node):
@@ -30,36 +32,36 @@ class ImportCollector(ast.NodeVisitor):
 
 
 class ImportGraph:
-    def __init__(self, source: str, source_path: str = None):
+    def __init__(self, source: str, source_manager: SourceManager):
         self.source = source
         self.graph = {}
         self.queue = []
-        self.source_path = source_path or '.'
+        self.source_manager = source_manager
 
     def get_graph(self) -> dict:
         self.graph = {}
         self.queue = []
-        self.get_imports_and_add_to_queue('__main__', self.source)
+        self.get_imports_and_add_to_queue(ModulePath('', '__main__'), self.source)
 
         while self.queue:
-            module_name = self.queue.pop(0)
-            if module_name in self.graph:
+            module_path = self.queue.pop(0)
+            if module_path in self.graph:
                 continue
 
-            source = self.get_module_source(module_name)
-            self.get_imports_and_add_to_queue(module_name, source)
+            source = self.get_module_source(module_path)
+            self.get_imports_and_add_to_queue(module_path, source)
 
         self.detect_loop()
 
         return self.graph
 
-    def get_module_source(self, module_name):
-        module = Module(module_name, self.source_path)
+    def get_module_source(self, module_path: ModulePath):
+        module = Module(module_path, self.source_manager)
         return module.get_source()
 
-    def get_imports_and_add_to_queue(self, module_name, source):
+    def get_imports_and_add_to_queue(self, module_path: ModulePath, source):
         imports = self.get_imports(source)
-        self.graph[module_name] = imports
+        self.graph[module_path] = imports
         self.queue.extend(imports)
 
     def get_imports(self, source) -> [str]:
@@ -72,19 +74,20 @@ class ImportGraph:
         graph_stack = []
         checked_modules = []
 
-        def check_loop(module_name):
-            if module_name in checked_modules:
+        def check_loop(module_path: ModulePath):
+            if module_path in checked_modules:
                 return
 
-            if module_name in graph_stack:
+            if module_path in graph_stack:
+                modules_chain = [f'{module.package}.{module.name}' for module in graph_stack + [module_path]]
                 raise TyphonImportError(
-                    f'There is circular imports detected: {" -> ".join(graph_stack + [module_name])}'
+                    f'There is circular imports detected: {" -> ".join(modules_chain)}'
                 )
 
-            graph_stack.append(module_name)
-            modules = self.graph[module_name]
-            for imported_module_name in modules:
-                check_loop(imported_module_name)
+            graph_stack.append(module_path)
+            modules = self.graph[module_path]
+            for imported_module_path in modules:
+                check_loop(imported_module_path)
             graph_stack.pop()
 
-        check_loop('__main__')
+        check_loop(ModulePath('', '__main__'))

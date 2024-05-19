@@ -2,7 +2,7 @@ import os.path
 from tempfile import TemporaryDirectory
 
 from tests.helpers import source_file
-from typhon.object_info import ModuleObjectInfo
+from typhon.types import ModulePath
 from typhon.project import Project
 
 
@@ -21,7 +21,7 @@ class TestProject:
         js_str = 'export {};\n\nprint(1 + 2);'
 
         with TemporaryDirectory() as temp_dir_path:
-            project = Project(source_path=temp_dir_path)
+            project = Project(temp_dir_path)
             file_path = os.path.join(temp_dir_path, 'test.py')
             js_path = os.path.join(temp_dir_path, 'test.js')
             with open(file_path, 'w') as f:
@@ -42,7 +42,7 @@ class TestProject:
         with source_file('a.py', source_2):
             project.transpile_source(source_1)
 
-        assert project.import_graph == {'__main__': ['a'], 'a': []}
+        assert project.import_graph == {ModulePath('', '__main__'): [ModulePath('', 'a')], ModulePath('', 'a'): []}
 
     def test_import_graph_from_file(self):
         source_1 = 'import a\nprint("test")'
@@ -52,29 +52,41 @@ class TestProject:
         with source_file('source.py', source_1), source_file('a.py', source_2):
             project.transpile_file('source.py')
 
-        assert project.import_graph == {'__main__': ['a'], 'a': []}
+        assert project.import_graph == {ModulePath('', '__main__'): [ModulePath('', 'a')], ModulePath('', 'a'): []}
 
     def test_get_sorted_modules_from_graph(self):
         graph = {
-            '__main__': ['a', 'b', 'c', 'e'],
-            'a': [],
-            'b': ['c'],
-            'c': ['d'],
-            'e': ['a'],
+            ModulePath('', '__main__'): [
+                ModulePath('', 'a'),
+                ModulePath('', 'b'),
+                ModulePath('', 'c'),
+                ModulePath('', 'e'),
+            ],
+            ModulePath('', 'a'): [],
+            ModulePath('', 'b'): [ModulePath('', 'c')],
+            ModulePath('', 'c'): [ModulePath('', 'd')],
+            ModulePath('', 'e'): [ModulePath('', 'a')],
         }
         project = Project()
         project.import_graph = graph
 
         modules = project.get_sorted_modules_from_graph()
 
-        assert modules == ['a', 'd', 'c', 'b', 'e', '__main__']
+        assert modules == [
+            ModulePath('', 'a'),
+            ModulePath('', 'd'),
+            ModulePath('', 'c'),
+            ModulePath('', 'b'),
+            ModulePath('', 'e'),
+            ModulePath('', '__main__'),
+        ]
 
     def test_transpile_importing_modules(self):
         source_1 = 'import test\nprint("test")'
         source_2 = 'print("Hello!")'
 
         with TemporaryDirectory() as temp_dir_path:
-            project = Project(source_path=temp_dir_path)
+            project = Project(temp_dir_path)
             source_file_2 = os.path.join(temp_dir_path, 'test.py')
             js_path = os.path.join(temp_dir_path, 'test.js')
             with source_file(source_file_2, source_2):
@@ -90,7 +102,7 @@ class TestProject:
         source_2 = 'print("Hello!")'
 
         with TemporaryDirectory() as temp_dir_path:
-            project = Project(source_path=temp_dir_path)
+            project = Project(temp_dir_path)
             source_file_1 = os.path.join(temp_dir_path, 'main.py')
             source_file_2 = os.path.join(temp_dir_path, 'test.py')
             test_js_path = os.path.join(temp_dir_path, 'test.js')
@@ -110,7 +122,7 @@ class TestProject:
         source_2 = 'import foo\nprint("Hello!")'
         source_3 = 'print("Foo!")'
 
-        project = Project(source_path=temp_dir)
+        project = Project(temp_dir)
         source_file_2 = os.path.join(temp_dir, 'test.py')
         source_file_3 = os.path.join(temp_dir, 'foo.py')
         with source_file(source_file_2, source_2), source_file(source_file_3, source_3):

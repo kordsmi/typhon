@@ -1,14 +1,16 @@
 from typhon.object_info import ObjectInfo
 from typhon.import_graph import ImportGraph
 from typhon.module_info import ModuleInfo
-from typhon.module_tools import Module, get_module_from_file
+from typhon.module import Module, get_module_from_file
+from typhon.source_manager import SourceManager
+from typhon.types import ModulePath
 from typhon.module_transpiler import ModuleTranspiler
 
 
 class Project:
     def __init__(self, source_path: str = None):
         self.import_graph = {}
-        self.source_path = source_path or '.'
+        self.source_manager = SourceManager(source_path)
         self.module_info_list = {}
         self.root_object = ObjectInfo(None)
 
@@ -17,20 +19,20 @@ class Project:
         Транспиляция переданного исходного кода. В ответе возвращается js-код.
         """
         self.transpile_related_modules(source)
-        module = Module(source_path=self.source_path)
+        module = Module(source_manager=self.source_manager)
         return self.transpile_module(module, source)
 
     def transpile_related_modules(self, source: str):
         self.get_import_graph(source)
         modules = self.get_sorted_modules_from_graph()
-        for module_name in modules:
-            if module_name == '__main__':
+        for module_path in modules:
+            if module_path.package == '' and module_path.name == '__main__':
                 continue
-            module = Module(module_name, self.source_path)
+            module = Module(module_path, self.source_manager)
             self.transpile_module(module)
 
     def get_import_graph(self, source: str):
-        import_graph = ImportGraph(source, source_path=self.source_path)
+        import_graph = ImportGraph(source, source_manager=self.source_manager)
         self.import_graph = import_graph.get_graph()
 
     def transpile_file(self, source_file_path: str) -> str:
@@ -45,16 +47,16 @@ class Project:
     def get_sorted_modules_from_graph(self):
         result = []
 
-        def add_modules(from_module: str):
-            if from_module in result:
+        def add_modules(module_path: ModulePath):
+            if module_path in result:
                 return
 
-            modules = self.import_graph.get(from_module, [])
+            modules = self.import_graph.get(module_path, [])
             for module in modules:
                 add_modules(module)
-            result.append(from_module)
+            result.append(module_path)
 
-        add_modules('__main__')
+        add_modules(ModulePath('', '__main__'))
         return result
 
     def transpile_module(self, module: Module, source: str = None):
