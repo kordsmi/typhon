@@ -13,12 +13,12 @@ class TestImportGraph:
         import_graph = ImportGraph(source, SourceManager())
         assert import_graph.get_graph() == {ModulePath('', '__main__'): []}
 
-    def test_graph__with_import(self):
+    def test_graph__with_import(self, temp_dir):
         source_1 = 'import a\nprint("test")'
         source_2 = 'print("Hello!")'
 
-        import_graph = ImportGraph(source_1, SourceManager())
-        with source_file('a.py', source_2):
+        import_graph = ImportGraph(source_1, SourceManager(temp_dir))
+        with source_file('a.py', source_2, temp_dir):
             graph = import_graph.get_graph()
 
         assert graph == {ModulePath('', '__main__'): [ModulePath('', 'a')], ModulePath('', 'a'): []}
@@ -31,12 +31,12 @@ class TestImportGraph:
 
         assert graph == {ModulePath('', '__main__'): []}
 
-    def test_graph__loop(self):
+    def test_graph__loop(self, temp_dir):
         source_1 = 'import a'
         source_2 = 'import b'
-        import_graph = ImportGraph(source_1, SourceManager())
+        import_graph = ImportGraph(source_1, SourceManager(temp_dir))
 
         with pytest.raises(TyphonImportError) as exc,\
-                source_file('a.py', source_2), source_file('b.py', source_1):
+                source_file('a.py', source_2, temp_dir), source_file('b.py', source_1, temp_dir):
             import_graph.get_graph()
         assert str(exc.value) == 'There is circular imports detected: .__main__ -> .a -> .b -> .a'

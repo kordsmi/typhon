@@ -1,3 +1,5 @@
+import os
+
 from typhon.object_info import ObjectInfo
 from typhon.import_graph import ImportGraph
 from typhon.module_info import ModuleInfo
@@ -39,6 +41,7 @@ class Project:
         """
         Транспиляция файла с исходным кодом. В ответ возвращается путь к оттранспилированному js-файлу.
         """
+        source_file_path = os.path.join(self.source_manager.project_path, source_file_path)
         module = get_module_from_file(source_file_path)
         self.transpile_related_modules(module.get_source())
         self.transpile_module(module)

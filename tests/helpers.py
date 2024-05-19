@@ -3,7 +3,10 @@ from contextlib import contextmanager
 
 
 @contextmanager
-def source_file(file_name, source=''):
+def source_file(file_name, source='', directory: str = None):
+    if directory:
+        file_name = os.path.join(directory, file_name)
+
     try:
         with open(file_name, 'w') as f:
             f.write(source)

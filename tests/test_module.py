@@ -39,7 +39,6 @@ class TestModule:
 
     def test_save_module_info(self, temp_dir):
         source = 'a = 123'
-        source_filename = os.path.join(temp_dir, 'a.py')
         module = Module(ModulePath('', 'a'), SourceManager(temp_dir))
 
         root_object = ObjectInfo(None)
