@@ -68,7 +68,13 @@ class ImportGraph:
         py_ast = ast.parse(source)
         import_collector = ImportCollector()
         import_collector.visit(py_ast)
-        return import_collector.imports
+        imports = []
+        for import_path in import_collector.imports:
+            if self.source_manager.is_package(import_path.name):
+                imports.append(ModulePath(import_path.name, '__init__'))
+            else:
+                imports.append(import_path)
+        return imports
 
     def detect_loop(self):
         graph_stack = []

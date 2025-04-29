@@ -1,6 +1,6 @@
 import pytest
 
-from tests.helpers import source_file
+from tests.helpers import source_file, make_package
 from typhon.exceptions import TyphonImportError
 from typhon.import_graph import ImportGraph
 from typhon.source_manager import SourceManager
@@ -40,3 +40,19 @@ class TestImportGraph:
                 source_file('a.py', source_2, temp_dir), source_file('b.py', source_1, temp_dir):
             import_graph.get_graph()
         assert str(exc.value) == 'There is circular imports detected: .__main__ -> .a -> .b -> .a'
+
+    def test_graph__with_package_import(self, temp_dir):
+        source_1 = 'import a\nprint("test")'
+        source_2 = 'print("Hello!")'
+
+        import_graph = ImportGraph(source_1, SourceManager(temp_dir))
+        with make_package('a', temp_dir) as package_path, source_file('__init__.py', source_2, package_path):
+            graph = import_graph.get_graph()
+
+        assert graph == {ModulePath('', '__main__'): [ModulePath('a', '__init__')], ModulePath('a', '__init__'): []}
+
+    def test_get_imports__package(self, temp_dir):
+        import_graph = ImportGraph('import pack', SourceManager(temp_dir))
+        with make_package('pack', temp_dir) as package_path, source_file('__init__.py', '', package_path):
+            imports = import_graph.get_imports('import pack')
+        assert imports == [ModulePath('pack', '__init__')]

@@ -13,3 +13,11 @@ def source_file(file_name, source='', directory: str = None):
         yield
     finally:
         os.unlink(file_name)
+
+
+@contextmanager
+def make_package(package_name: str, direcotry: str = None):
+    if direcotry:
+        package_name = os.path.join(direcotry, package_name)
+    os.mkdir(package_name)
+    yield package_name

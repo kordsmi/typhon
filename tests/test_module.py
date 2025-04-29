@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
+from tests.helpers import make_package, source_file
 from typhon.object_info import ObjectInfo
 from typhon.js_node_serializer import serialize_js_node
 from typhon.module_info import ModuleInfo
@@ -80,6 +81,11 @@ class TestModule:
         assert loaded_module_info.js_tree == module_info.js_tree
 
     def test_module_path(self, temp_dir):
-        source = 'a = 123'
         module = Module(ModulePath('', 'a'), SourceManager(temp_dir))
-        assert module.source_path == temp_dir
+        assert module.source_path == os.path.join(temp_dir, '')
+
+    def test_get_source(self, temp_dir):
+        module = Module(ModulePath('a', 'b'), SourceManager(temp_dir))
+        with make_package('a', temp_dir) as package_path, source_file('b.py', 'test file', package_path):
+            source = module.get_source()
+        assert source == 'test file'

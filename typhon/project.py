@@ -63,7 +63,10 @@ class Project:
         return result
 
     def transpile_module(self, module: Module, source: str = None):
-        transpiler = ModuleTranspiler(source or module.get_source(), self.root_object, module.module_name)
+        module_name = module.module_name
+        if module_name == '__init__':
+            module_name = module.module_path.package
+        transpiler = ModuleTranspiler(source or module.get_source(), self.root_object, module_name)
         try:
             target_code = transpiler.transpile()
         finally:
