@@ -70,6 +70,16 @@ class ConstantObjectInfo(ObjectInfo):
 class ReferenceObjectInfo(ObjectInfo):
     _fields = ObjectInfo._fields + ('ref', )
 
-    def __init__(self, context_path: List[str], ref: List[str]):
-        super().__init__(context_path)
-        self.ref = ref
+    def __init__(self, context_path: List[str], reference: ObjectInfo):
+            super().__init__(context_path)
+            self.reference = reference
+
+    @classmethod
+    def deserialize(cls, root_object: ObjectInfo, context_path: List[str], ref: List[str]):
+        from typhon.context import get_object
+        ref_object = get_object(root_object, ref[:-1], ref[-1])
+        return cls(context_path, ref_object)
+
+    @property
+    def ref(self):
+        return self.reference.context_path

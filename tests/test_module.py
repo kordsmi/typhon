@@ -75,7 +75,7 @@ class TestModule:
         module.save_info(module_info)
 
         loaded_module = Module(ModulePath('', 'a'), SourceManager(temp_dir))
-        loaded_module_info = loaded_module.load_info()
+        loaded_module_info = loaded_module.load_info(root_object)
 
         assert loaded_module_info.objects == module_info.objects
         assert loaded_module_info.js_tree == module_info.js_tree

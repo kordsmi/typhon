@@ -1,7 +1,7 @@
 import copy
 
 from typhon import js_ast
-from typhon.object_info import ObjectInfo, ModuleObjectInfo, ConstantObjectInfo
+from typhon.object_info import ObjectInfo, ModuleObjectInfo, ConstantObjectInfo, TypeObjectInfo, ReferenceObjectInfo
 from typhon.module_transpiler import ModuleTranspiler
 
 
@@ -78,6 +78,7 @@ class TestModuleTranspiler:
         assert js_module.export == js_ast.JSExport(['TestClass'])
 
     def test_import_object_to_globals(self, temp_dir):
+        # Константы импортируются как константы
         source_1 = 'from test import a'
         source_2 = 'a = 123'
 
@@ -91,6 +92,22 @@ class TestModuleTranspiler:
         object_info = transpiler.module_object.object_dict['a']
         assert isinstance(object_info, ConstantObjectInfo)
         assert object_info.value == 123
+
+    def test_import_class_to_globals(self, temp_dir):
+        # Всё что не относится к константам, импортируются как ссылки
+        source_1 = 'from test import A'
+        source_2 = 'class A: pass'
+
+        transpiler = ModuleTranspiler(source_2, self.root_object, 'test')
+        transpiler.transpile()
+
+        transpiler = ModuleTranspiler(source_1, self.root_object, '__main__')
+        transpiler.transpile()
+
+        assert list(transpiler.module_object.object_dict.keys()) == ['__special__', 'A']
+        object_info = transpiler.module_object.object_dict['A']
+        assert isinstance(object_info, ReferenceObjectInfo)
+        assert isinstance(object_info.reference, TypeObjectInfo)
 
     def test_special_module(self):
         """ Для модуля __special__ не нужно подключать модуль __special__ (самого себя) """

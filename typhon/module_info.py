@@ -27,10 +27,10 @@ def serialize_module_info(module_info: ModuleInfo) -> dict:
     }
 
 
-def deserialize_module_info(data: dict) -> ModuleInfo:
+def deserialize_module_info(data: dict, root_object: ObjectInfo) -> ModuleInfo:
     objects_data = data.get('objects')
     nodes_info = data.get('nodes', {})
     node_deserializer = JSNodeDeserializer(nodes_info)
     js_tree = node_deserializer.deserialize()
-    objects = deserialize_object_info(objects_data)
+    objects = deserialize_object_info(objects_data, root_object)
     return ModuleInfo(objects=objects, js_tree=js_tree)

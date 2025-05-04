@@ -44,12 +44,14 @@ def get_object(
         if path_item not in current_object.object_dict:
             raise ContextPathError(context_path)
         current_object = current_object.object_dict[path_item]
+        if isinstance(current_object, ReferenceObjectInfo):
+            current_object = current_object.reference
         search_and_add_result(current_object)
 
     if object_name is None:
         result = current_object
 
     if result and isinstance(result, ReferenceObjectInfo):
-        return get_object(from_object, result.ref)
+        return result.reference
 
     return result

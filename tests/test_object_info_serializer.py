@@ -38,7 +38,7 @@ class TestSerializeDeserializeObjectInfo:
     def test_reference(self):
         root_object = ObjectInfo(None)
         var_1 = ObjectInfo(['var_1'])
-        var_2 = ReferenceObjectInfo(['test', 'var_2'], ['var_1'])
+        var_2 = ReferenceObjectInfo(['test', 'var_2'], var_1)
         test_func = FunctionObjectInfo(['test'])
         test_func.object_dict = {
             'var_2': var_2,

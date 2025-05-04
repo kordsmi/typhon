@@ -65,8 +65,12 @@ class Tranformer(JSNodeVisitor):
         if target_context:
             value_context = get_object_from_expression(self.root_object, target_context.context_path, node)
             if value_context.context_path:
-                value_context = ReferenceObjectInfo(None, value_context.context_path)
-            value_context.context_path = target_context.context_path + [target_name]
+                if isinstance(value_context, ConstantObjectInfo):
+                    value_context = ConstantObjectInfo(target_context.context_path + [target_name], value_context.value)
+                else:
+                    value_context = ReferenceObjectInfo(target_context.context_path + [target_name], value_context)
+            else:
+                value_context.context_path = target_context.context_path + [target_name]
             target_context.object_dict[target_name] = value_context
             return value_context
 
@@ -124,6 +128,9 @@ class Tranformer(JSNodeVisitor):
         new_body = body_transformer.transform()
         if new_args or new_body:
             return js_ast.JSFunctionDef(node.name, new_args or node.args, new_body or node.body)
+
+    def visit_JSList(self, node: js_ast.JSList):
+        return node
 
     def _check_and_transform_call_to_new(self, node: js_ast.JSCall) -> Optional[js_ast.JSNew]:
         id_info = self._get_node_info(node.func)
@@ -190,10 +197,13 @@ class BodyTransformer(Tranformer):
             # Добавление импортируемых объектов
             for alias in node.names:
                 object_name = alias.asname or alias.name
-                self.context_vars.object_dict[object_name] = module_info.object_dict[alias.name]
+                object_info = module_info.object_dict[alias.name]
+                if not isinstance(object_info, ConstantObjectInfo):
+                    object_info = ReferenceObjectInfo(self.context_path + [object_name], object_info)
+                self.context_vars.object_dict[object_name] = object_info
         else:
             # Добавление модуля как объекта
-            self.context_vars.object_dict[module_name] = module_info
+            self.context_vars.object_dict[module_name] = ReferenceObjectInfo(self.context_path + [module_name], module_info)
 
 
 class ClassTransformer(Tranformer):

@@ -25,19 +25,25 @@ def serialize_object_info(root_object: ObjectInfo, context_path: List[str] = Non
     return data
 
 
-def deserialize_object_info(data: dict) -> ObjectInfo:
+def deserialize_object_info(data: dict, root_object: ObjectInfo = None) -> ObjectInfo:
     data = copy.copy(data)
     class_name = data.pop('class')
     cls = registry[class_name]
     object_class = data.pop('object_class')
     object_dict_data = data.pop('object_dict')
 
-    object_info: ObjectInfo = cls(**data)
+    if hasattr(cls, 'deserialize'):
+        object_info = cls.deserialize(root_object, **data)
+    else:
+        object_info: ObjectInfo = cls(**data)
+
+    if root_object is None:
+        root_object = object_info
+
     object_info.object_class = object_class
 
-    object_dict = {}
+    object_dict = object_info.object_dict
     for key, data in object_dict_data.items():
-        object_dict[key] = deserialize_object_info(data)
-    object_info.object_dict = object_dict
+        object_dict[key] = deserialize_object_info(data, root_object)
 
     return object_info

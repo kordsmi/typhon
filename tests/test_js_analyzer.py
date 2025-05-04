@@ -39,6 +39,33 @@ def test_create_object_reference_on_assign():
     js_body = [
         js_ast.JSAssign(
             js_ast.JSName('b'),
+            js_ast.JSList(js_ast.JSExpression()),
+        ),
+        js_ast.JSAssign(
+            js_ast.JSName('a'),
+            js_ast.JSName('b'),
+        ),
+        js_ast.JSAssign(
+            js_ast.JSName('c'),
+            js_ast.JSName('a'),
+        ),
+    ]
+    root_object = ObjectInfo(None)
+    body_transformer = BodyTransformer(js_body, [], root_object)
+    body_transformer.transform()
+
+    b = ObjectInfo(['b'], None)
+    assert root_object.object_dict == {
+        'a': ReferenceObjectInfo(['a'], b),
+        'b': b,
+        'c': ReferenceObjectInfo(['c'], b),
+    }
+
+
+def test_copy_constant_on_assign():
+    js_body = [
+        js_ast.JSAssign(
+            js_ast.JSName('b'),
             js_ast.JSConstant(100),
         ),
         js_ast.JSAssign(
@@ -55,9 +82,9 @@ def test_create_object_reference_on_assign():
     body_transformer.transform()
 
     assert root_object.object_dict == {
-        'a': ReferenceObjectInfo(['a'], ['b']),
+        'a': ConstantObjectInfo(['a'], 100),
         'b': ConstantObjectInfo(['b'], 100),
-        'c': ReferenceObjectInfo(['c'], ['b']),
+        'c': ConstantObjectInfo(['c'], 100),
     }
 
 
@@ -97,7 +124,7 @@ def test_transform_function_to_method__replace_self_to_this():
     this_object = ObjectInfo(['foo', 'this'])
     this_object.object_dict = {
         'b': ConstantObjectInfo(['foo', 'this', 'b'], 100),
-        'a': ReferenceObjectInfo(['foo', 'this', 'a'], ['foo', 'this', 'b']),
+        'a': ConstantObjectInfo(['foo', 'this', 'a'], 100),
     }
     self_object.object_dict['__ty_alias__'] = ConstantObjectInfo(['foo', 'self', '__ty_alias__'], 'this')
     assert root_object.object_dict['foo'].object_dict == {
