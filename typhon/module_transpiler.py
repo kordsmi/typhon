@@ -5,17 +5,25 @@ from typhon.generator import generate_js_module
 from typhon.object_info import ObjectInfo, ModuleObjectInfo
 from typhon.js_analyzer import BodyTransformer
 from typhon.transpiler import transpile_module
+from typhon.types import ModulePath
 
 
 class ModuleTranspiler:
-    def __init__(self, source: str, root_object: ObjectInfo, module_name: str):
+    def __init__(self, source: str, root_object: ObjectInfo, module_path: ModulePath):
         self.source = source
         self.py_tree = None
         self.js_tree = None
-        self.name = module_name
+        self.module_path = module_path
+        self.name = module_path.name
+        packages = module_path.packages
+        if self.name == '__init__':
+            self.name = module_path.module_path[-2]
+            packages = module_path.module_path[:-2]
         self.root_object = root_object
-        root_object.object_dict[self.name] = ModuleObjectInfo([self.name], self.name)
-        self.module_object: ModuleObjectInfo = root_object.object_dict[self.name]
+        for package in packages:
+            self.root_object = self.root_object.object_dict[package]
+        self.root_object.object_dict[self.name] = ModuleObjectInfo(self.root_object.context_path + [self.name], self.name)
+        self.module_object: ModuleObjectInfo = self.root_object.object_dict[self.name]
         if self.name != '__special__':
             special_module_info = ModuleObjectInfo([self.name, '__special__'], '__special__.py')
             self.module_object.object_dict['__special__'] = special_module_info

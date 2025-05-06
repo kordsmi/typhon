@@ -3,6 +3,7 @@ import copy
 from typhon import js_ast
 from typhon.object_info import ObjectInfo, ModuleObjectInfo, ConstantObjectInfo, TypeObjectInfo, ReferenceObjectInfo
 from typhon.module_transpiler import ModuleTranspiler
+from typhon.types import ModulePath
 
 
 class TestModuleTranspiler:
@@ -10,13 +11,13 @@ class TestModuleTranspiler:
         self.root_object = ObjectInfo(None)
 
     def transform(self, js_tree: js_ast.JSModule):
-        transpiler = ModuleTranspiler(None, self.root_object, '__main__')
+        transpiler = ModuleTranspiler(None, self.root_object, ModulePath('__main__'))
         transpiler.js_tree = js_tree
         transpiler.transform()
         return transpiler.js_tree
 
     def test_base(self):
-        ModuleTranspiler(None, self.root_object, '__main__')
+        ModuleTranspiler(None, self.root_object, ModulePath('__main__'))
         special_info = self.root_object.object_dict['__main__'].object_dict['__special__']
         assert isinstance(special_info, ModuleObjectInfo)
         assert special_info.context_path == ['__main__', '__special__']
@@ -82,10 +83,10 @@ class TestModuleTranspiler:
         source_1 = 'from test import a'
         source_2 = 'a = 123'
 
-        transpiler = ModuleTranspiler(source_2, self.root_object, 'test')
+        transpiler = ModuleTranspiler(source_2, self.root_object, ModulePath('test'))
         transpiler.transpile()
 
-        transpiler = ModuleTranspiler(source_1, self.root_object, '__main__')
+        transpiler = ModuleTranspiler(source_1, self.root_object, ModulePath('__main__'))
         transpiler.transpile()
 
         assert list(transpiler.module_object.object_dict.keys()) == ['__special__', 'a']
@@ -98,10 +99,10 @@ class TestModuleTranspiler:
         source_1 = 'from test import A'
         source_2 = 'class A: pass'
 
-        transpiler = ModuleTranspiler(source_2, self.root_object, 'test')
+        transpiler = ModuleTranspiler(source_2, self.root_object, ModulePath('test'))
         transpiler.transpile()
 
-        transpiler = ModuleTranspiler(source_1, self.root_object, '__main__')
+        transpiler = ModuleTranspiler(source_1, self.root_object, ModulePath('__main__'))
         transpiler.transpile()
 
         assert list(transpiler.module_object.object_dict.keys()) == ['__special__', 'A']
@@ -111,5 +112,5 @@ class TestModuleTranspiler:
 
     def test_special_module(self):
         """ Для модуля __special__ не нужно подключать модуль __special__ (самого себя) """
-        ModuleTranspiler(None, self.root_object, '__special__')
+        ModuleTranspiler(None, self.root_object, ModulePath('__special__'))
         assert self.root_object.object_dict['__special__'].object_dict == {}

@@ -27,7 +27,7 @@ class TestModule:
         source = 'print(a)'
         module = Module(source_manager=SourceManager(temp_dir))
         root_object = ObjectInfo([])
-        transpiler = ModuleTranspiler(source, root_object, 'test')
+        transpiler = ModuleTranspiler(source, root_object, ModulePath('test'))
         transpiler.transpile()
         module_info = ModuleInfo(objects=root_object, js_tree=transpiler.js_tree)
         module.save_info(module_info)
@@ -43,7 +43,7 @@ class TestModule:
         module = Module(ModulePath('', 'a'), SourceManager(temp_dir))
 
         root_object = ObjectInfo(None)
-        transpiler = ModuleTranspiler(source, root_object, 'test')
+        transpiler = ModuleTranspiler(source, root_object, ModulePath('test'))
         transpiler.transpile()
         module_info = ModuleInfo(objects=root_object, js_tree=transpiler.js_tree)
         module.save_info(module_info)
@@ -69,7 +69,7 @@ class TestModule:
         module = Module(ModulePath('', 'a'), SourceManager(temp_dir))
 
         root_object = ObjectInfo(None)
-        transpiler = ModuleTranspiler(source, root_object, 'test')
+        transpiler = ModuleTranspiler(source, root_object, ModulePath('test'))
         transpiler.transpile()
         module_info = ModuleInfo(objects=root_object, js_tree=transpiler.js_tree)
         module.save_info(module_info)

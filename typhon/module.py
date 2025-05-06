@@ -11,7 +11,7 @@ from typhon.types import ModulePath
 
 class Module:
     def __init__(self, module_path: ModulePath = None, source_manager: SourceManager = None):
-        self.module_path = module_path or ModulePath('', '__main__')
+        self.module_path = module_path or ModulePath('__main__')
         self.module_name = self.module_path.name
         source_manager = source_manager or SourceManager()
         self.source_path = source_manager.get_package_path(self.module_path.package)
@@ -70,5 +70,5 @@ class Module:
 def get_module_from_file(source_file_path: str) -> Module:
     source_path, filename = os.path.split(source_file_path)
     filename, ext = os.path.splitext(filename)
-    module = Module(ModulePath('', filename), SourceManager(source_path))
+    module = Module(ModulePath(filename), SourceManager(source_path))
     return module

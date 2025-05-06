@@ -42,7 +42,7 @@ class TestProject:
         with source_file('a.py', source_2, temp_dir):
             project.transpile_source(source_1)
 
-        assert project.import_graph == {ModulePath('', '__main__'): [ModulePath('', 'a')], ModulePath('', 'a'): []}
+        assert project.import_graph == {('__main__',): [ModulePath('a')], ('a',): []}
 
     def test_import_graph_from_file(self, temp_dir):
         source_1 = 'import a\nprint("test")'
@@ -52,20 +52,20 @@ class TestProject:
         with source_file('source.py', source_1, temp_dir), source_file('a.py', source_2, temp_dir):
             project.transpile_file('source.py')
 
-        assert project.import_graph == {ModulePath('', '__main__'): [ModulePath('', 'a')], ModulePath('', 'a'): []}
+        assert project.import_graph == {('__main__',): [ModulePath('a')], ('a',): []}
 
     def test_get_sorted_modules_from_graph(self, temp_dir):
         graph = {
-            ModulePath('', '__main__'): [
-                ModulePath('', 'a'),
-                ModulePath('', 'b'),
-                ModulePath('', 'c'),
-                ModulePath('', 'e'),
+            ('__main__',): [
+                ModulePath('a'),
+                ModulePath('b'),
+                ModulePath('c'),
+                ModulePath('e'),
             ],
-            ModulePath('', 'a'): [],
-            ModulePath('', 'b'): [ModulePath('', 'c')],
-            ModulePath('', 'c'): [ModulePath('', 'd')],
-            ModulePath('', 'e'): [ModulePath('', 'a')],
+            ('a',): [],
+            ('b',): [ModulePath('c')],
+            ('c',): [ModulePath('d')],
+            ('e',): [ModulePath('a')],
         }
         project = Project(temp_dir)
         project.import_graph = graph
@@ -73,12 +73,12 @@ class TestProject:
         modules = project.get_sorted_modules_from_graph()
 
         assert modules == [
-            ModulePath('', 'a'),
-            ModulePath('', 'd'),
-            ModulePath('', 'c'),
-            ModulePath('', 'b'),
-            ModulePath('', 'e'),
-            ModulePath('', '__main__'),
+            ModulePath('a'),
+            ModulePath('d'),
+            ModulePath('c'),
+            ModulePath('b'),
+            ModulePath('e'),
+            ModulePath('__main__'),
         ]
 
     def test_transpile_importing_modules(self):

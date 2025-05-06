@@ -1,4 +1,5 @@
 import os.path
+from typhon.types import ModulePath
 
 
 class SourceManager:
@@ -8,8 +9,8 @@ class SourceManager:
     def get_package_path(self, package: str):
         return os.path.join(self.project_path, package)
 
-    def is_package(self, name: str):
-        full_path = os.path.join(self.project_path, name)
+    def is_package(self, module: ModulePath):
+        full_path = os.path.join(self.project_path, *module.module_path)
         if not os.path.isdir(full_path):
             return False
         init_file = os.path.join(full_path, '__init__.py')

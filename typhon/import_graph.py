@@ -16,7 +16,11 @@ class ImportCollector(ast.NodeVisitor):
     def visit_Import(self, node: Import) -> Any:
         names: [ast.alias] = node.names
         for name in names:
-            self.imports.append(ModulePath('', name.name))
+            module_parts = name.name.split('.')
+            module_path = []
+            for module_part in module_parts:
+                module_path.append(module_part)
+                self.imports.append(ModulePath(*module_path))
 
     def generic_visit(self, node: AST) -> Any:
         for field, value in ast.iter_fields(node):
@@ -41,11 +45,11 @@ class ImportGraph:
     def get_graph(self) -> dict:
         self.graph = {}
         self.queue = []
-        self.get_imports_and_add_to_queue(ModulePath('', '__main__'), self.source)
+        self.get_imports_and_add_to_queue(ModulePath('__main__'), self.source)
 
         while self.queue:
             module_path = self.queue.pop(0)
-            if module_path in self.graph:
+            if module_path.module_path in self.graph:
                 continue
 
             source = self.get_module_source(module_path)
@@ -61,7 +65,7 @@ class ImportGraph:
 
     def get_imports_and_add_to_queue(self, module_path: ModulePath, source):
         imports = self.get_imports(source)
-        self.graph[module_path] = imports
+        self.graph[module_path.module_path] = imports
         self.queue.extend(imports)
 
     def get_imports(self, source) -> [str]:
@@ -70,7 +74,7 @@ class ImportGraph:
         import_collector.visit(py_ast)
         imports = []
         for import_path in import_collector.imports:
-            if self.source_manager.is_package(import_path.name):
+            if self.source_manager.is_package(import_path):
                 imports.append(ModulePath(import_path.name, '__init__'))
             else:
                 imports.append(import_path)
@@ -91,9 +95,9 @@ class ImportGraph:
                 )
 
             graph_stack.append(module_path)
-            modules = self.graph[module_path]
+            modules = self.graph[module_path.module_path]
             for imported_module_path in modules:
                 check_loop(imported_module_path)
             graph_stack.pop()
 
-        check_loop(ModulePath('', '__main__'))
+        check_loop(ModulePath('__main__'))

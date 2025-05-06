@@ -54,19 +54,16 @@ class Project:
             if module_path in result:
                 return
 
-            modules = self.import_graph.get(module_path, [])
+            modules = self.import_graph.get(module_path.module_path, [])
             for module in modules:
                 add_modules(module)
             result.append(module_path)
 
-        add_modules(ModulePath('', '__main__'))
+        add_modules(ModulePath('__main__'))
         return result
 
     def transpile_module(self, module: Module, source: str = None):
-        module_name = module.module_name
-        if module_name == '__init__':
-            module_name = module.module_path.package
-        transpiler = ModuleTranspiler(source or module.get_source(), self.root_object, module_name)
+        transpiler = ModuleTranspiler(source or module.get_source(), self.root_object, module.module_path)
         try:
             target_code = transpiler.transpile()
         finally:

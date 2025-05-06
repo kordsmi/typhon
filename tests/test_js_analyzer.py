@@ -6,6 +6,7 @@ from typhon.object_info import ObjectInfo, TypeObjectInfo, FunctionObjectInfo, C
 from typhon.js_analyzer import BodyTransformer, ClassTransformer
 from typhon.module_transpiler import ModuleTranspiler
 from typhon.transpiler import transpile_module
+from typhon.types import ModulePath
 
 
 def test_transform_body__transform_class_method():
@@ -216,7 +217,7 @@ c = a'''
         source_2 = 'class A:\n    pass'
 
         root_object = ObjectInfo(None)
-        test_module_transpiler = ModuleTranspiler(source_2, root_object, 'test')
+        test_module_transpiler = ModuleTranspiler(source_2, root_object, ModulePath('test'))
         test_module_transpiler.transpile()
 
         py_tree = ast.parse(source_1)

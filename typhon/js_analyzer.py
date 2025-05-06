@@ -191,7 +191,10 @@ class BodyTransformer(Tranformer):
 
     def _add_import_info(self, node: js_ast.JSImport):
         module_name = node.alias or node.module
-        module_info = self.root_object.object_dict[module_name]
+        module_path = tuple(module_name.split('.'))
+        module_info = self.root_object
+        for path_item in module_path:
+            module_info = module_info.object_dict[path_item]
 
         if node.names:
             # Добавление импортируемых объектов
@@ -203,6 +206,7 @@ class BodyTransformer(Tranformer):
                 self.context_vars.object_dict[object_name] = object_info
         else:
             # Добавление модуля как объекта
+            module_name = module_path[-1]
             self.context_vars.object_dict[module_name] = ReferenceObjectInfo(self.context_path + [module_name], module_info)
 
 
