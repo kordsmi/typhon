@@ -1,4 +1,8 @@
 class ModulePath:
+    """Класс `ModulePath` представляет путь к модулю:
+    - Хранит путь в виде кортежа
+    - Предоставляет свойства для имени, пакета и компонентов пакета
+    """
     def __init__(self, *items):
         self.module_path = tuple(items)
 

@@ -1,5 +1,4 @@
-from typing import Union, List
-
+from typing import Union, List, Optional
 
 registry = {}
 
@@ -11,12 +10,13 @@ class ObjectInfoMeta(type):
 
 
 class ObjectInfo(metaclass=ObjectInfoMeta):
+    """Базовый класс для информации об объектах"""
     _fields = (
         'context_path',
         'object_class',
     )
 
-    def __init__(self, context_path: List[str], object_class: List[str] = None):
+    def __init__(self, context_path: Optional[List[str]], object_class: List[str] = None):
         self.context_path = context_path or []
         self.object_class = object_class
         self.object_dict = {}
@@ -44,10 +44,12 @@ class ObjectInfo(metaclass=ObjectInfoMeta):
 
 
 class TypeObjectInfo(ObjectInfo):
+    """Информация о типах"""
     pass
 
 
 class ModuleObjectInfo(ObjectInfo):
+    """Информация о модулях"""
     _fields = ObjectInfo._fields + ('file', )
 
     def __init__(self, context_path: List[str], file: str):
@@ -56,18 +58,21 @@ class ModuleObjectInfo(ObjectInfo):
 
 
 class FunctionObjectInfo(TypeObjectInfo):
+    """Информация о функциях"""
     pass
 
 
 class ConstantObjectInfo(ObjectInfo):
+    """Информация о константах"""
     _fields = ObjectInfo._fields + ('value',)
 
-    def __init__(self, context_path: List[str], value: Union[str, int]):
+    def __init__(self, context_path: Optional[List[str]], value: Union[str, int]):
         super().__init__(context_path)
         self.value = value
 
 
 class ReferenceObjectInfo(ObjectInfo):
+    """Ссылки на другие объекты"""
     _fields = ObjectInfo._fields + ('ref', )
 
     def __init__(self, context_path: List[str], reference: ObjectInfo):

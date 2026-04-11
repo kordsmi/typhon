@@ -18,7 +18,9 @@ def _or(item1, item2) -> typing.Any:
 
 
 class JSNodeVisitor:
-    def visit(self, node: js_ast.JSNode) -> Optional[Union[js_ast.JSNode, List[js_ast.JSNode]]]:
+    """Базовый класс для посещения узлов AST JavaScript"""
+    def visit(self, node: js_ast.JSNode | List[js_ast.JSStatement]) \
+            -> Optional[Union[js_ast.JSNode, List[js_ast.JSNode]]]:
         if isinstance(node, list):
             return self.visit_list(node)
 
@@ -26,7 +28,7 @@ class JSNodeVisitor:
         method = getattr(self, method_name)
         return method(node)
 
-    def visit_list(self, node_list: [js_ast.JSNode]) -> [js_ast.JSNode]:
+    def visit_list(self, node_list: list[js_ast.JSStatement]) -> Optional[List[js_ast.JSStatement]]:
         new_list = []
         modified = False
         for item in node_list:
@@ -42,16 +44,20 @@ class JSNodeVisitor:
         if modified:
             return new_list
 
+        return None
+
     def visit_JSLet(self, node: js_ast.JSLet) -> Optional[js_ast.JSLet]:
-        new_assign: js_ast.JSAssign = self.visit(node.assign)
+        new_assign: js_ast.JSAssign | None = self.visit(node.assign)
         if new_assign:
             return js_ast.JSLet(new_assign)
+        return None
 
     def visit_JSAssign(self, node: js_ast.JSAssign) -> Optional[js_ast.JSAssign]:
         new_target = self.visit(node.target)
         new_value = self.visit(node.value)
         if new_target or new_value:
             return js_ast.JSAssign(new_target or node.target, new_value or node.value)
+        return None
 
     def visit_JSName(self, node: js_ast.JSName) -> Optional[js_ast.JSName]:
         pass
@@ -64,6 +70,7 @@ class JSNodeVisitor:
         new_body = self.visit(node.body)
         if new_args or new_body:
             return js_ast.JSFunctionDef(node.name, new_args or node.args, new_body or node.body)
+        return None
 
     def visit_JSArguments(self, node: js_ast.JSArguments) -> Optional['js_ast.JSArguments']:
         args = node.args
@@ -83,19 +90,30 @@ class JSNodeVisitor:
             return js_ast.JSArguments(_or(new_args, args), _or(new_defaults, defaults), _or(new_vararg, vararg),
                                       _or(new_kwonlyargs, kwonlyargs), _or(new_kw_defaults, kw_defaults),
                                       _or(new_kwarg, kwarg))
+        return None
 
     def visit_JSImport(self, node: js_ast.JSImport) -> Optional[js_ast.JSImport]:
-        new_names = self.visit(node.names) if node.names else None
-        if new_names:
-            return js_ast.JSImport(node.module, new_names, node.alias)
+        names = []
+        for name in node.names:
+            new_name = self.visit_JSAlias(name)
+            if new_name:
+                names.append(new_name)
+            else:
+                names.append(name)
 
-    def visit_JSAlias(self, node: js_ast.JSAlias) -> Optional['js_ast.JSAlias']:
+        if names:
+            return js_ast.JSImport(node.module, names, node.alias)
+
+        return None
+
+    def visit_JSAlias(self, node: js_ast.JSAlias) -> Optional[js_ast.JSAlias]:
         pass
 
-    def visit_JSClassDef(self, node: js_ast.JSClassDef) -> Optional['js_ast.JSClassDef']:
-        new_body = self.visit(node.body)
+    def visit_JSClassDef(self, node: js_ast.JSClassDef) -> Optional[js_ast.JSClassDef]:
+        new_body = self.visit_list(node.body)
         if new_body:
             return js_ast.JSClassDef(node.name, new_body)
+        return None
 
     def visit_JSArg(self, node: js_ast.JSArg) -> Optional[js_ast.JSArg]:
         pass
@@ -105,8 +123,17 @@ class JSNodeVisitor:
 
     def visit_JSCodeExpression(self, node: js_ast.JSCodeExpression) -> Optional[js_ast.JSCodeExpression]:
         new_value = self.visit(node.value)
-        if new_value:
-            return js_ast.JSCodeExpression(new_value)
+        if not new_value:
+            return None
+
+        assert isinstance(new_value, (js_ast.JSExpression, js_ast.JSStatement))
+        return js_ast.JSCodeExpression(new_value)
+
+    def visit_JSStatement(self, node: js_ast.JSStatement) -> Optional[js_ast.JSStatement]:
+        return None
+
+    def visit_JSExpression(self, node: js_ast.JSExpression) -> Optional[js_ast.JSExpression]:
+        return None
 
     def visit_JSCall(self, node: js_ast.JSCall) -> Optional[js_ast.JSCall]:
         new_func = self.visit(node.func)
@@ -114,6 +141,7 @@ class JSNodeVisitor:
         new_keywords = self.visit(node.keywords) if node.keywords else None
         if new_func or new_args or new_keywords:
             return js_ast.JSCall(new_func or node.func, new_args or node.args, new_keywords or node.keywords)
+        return None
 
     def visit_JSBinOp(self, node: js_ast.JSBinOp) -> Optional[js_ast.JSBinOp]:
         pass
@@ -122,13 +150,16 @@ class JSNodeVisitor:
         new_value = self.visit(node.value)
         if new_value:
             return js_ast.JSAttribute(new_value or node.value, node.attr)
+        return None
 
     def visit_JSKeyWord(self, node: js_ast.JSKeyWord) -> Optional[js_ast.JSKeyWord]:
         new_value = self.visit(node.value)
         if new_value:
             return js_ast.JSKeyWord(arg=node.arg, value=_or(new_value, node.value))
+        return None
 
     def visit_JSReturn(self, node: js_ast.JSReturn) -> Optional[js_ast.JSReturn]:
-        new_value = self.visit(node.value)
+        new_value = self.visit_JSExpression(node.value)
         if new_value:
             return js_ast.JSReturn(new_value)
+        return None

@@ -16,23 +16,23 @@ def get_attribute_target(from_object: ObjectInfo, node: js_ast.JSAttribute) -> O
     raise Exception(f'Unsupported node type {type(node)}')
 
 
-def get_object_from_expression(
+def get_object_from_node(
         from_object: ObjectInfo,
         context_path: List[str],
-        node: js_ast.JSExpression,
+        node: js_ast.JSNode,
 ) -> ObjectInfo:
     if isinstance(node, js_ast.JSName):
         source_object = get_object(from_object, context_path, node.id)
         return source_object
     if isinstance(node, js_ast.JSNew):
-        class_ = get_object_from_expression(from_object, context_path, node.class_)
+        class_ = get_object_from_node(from_object, context_path, node.class_)
         object_info = ObjectInfo(None)
         object_info.object_class = class_
         return object_info
     if isinstance(node, js_ast.JSConstant):
         return ConstantObjectInfo(None, node.value)
     if isinstance(node, js_ast.JSAttribute):
-        object_info = get_object_from_expression(from_object, context_path, node.value)
+        object_info = get_object_from_node(from_object, context_path, node.value)
         return get_object(from_object, object_info.context_path, node.attr)
     if isinstance(node, js_ast.JSArg):
         return ObjectInfo(None)
@@ -40,7 +40,8 @@ def get_object_from_expression(
     return ObjectInfo(None)
 
 
-class Tranformer(JSNodeVisitor):
+class Transformer(JSNodeVisitor):
+    """Базовый класс для преобразования AST JavaScript"""
     def __init__(self, context_path: List[str], root_object: ObjectInfo):
         self.context_path = context_path
         self.root_object = root_object
@@ -60,10 +61,10 @@ class Tranformer(JSNodeVisitor):
             self,
             target_context: ObjectInfo,
             target_name: str,
-            node: js_ast.JSExpression,
+            node: js_ast.JSNode,
     ) -> Optional[ObjectInfo]:
         if target_context:
-            value_context = get_object_from_expression(self.root_object, target_context.context_path, node)
+            value_context = get_object_from_node(self.root_object, target_context.context_path, node)
             if value_context.context_path:
                 if isinstance(value_context, ConstantObjectInfo):
                     value_context = ConstantObjectInfo(target_context.context_path + [target_name], value_context.value)
@@ -128,6 +129,7 @@ class Tranformer(JSNodeVisitor):
         new_body = body_transformer.transform()
         if new_args or new_body:
             return js_ast.JSFunctionDef(node.name, new_args or node.args, new_body or node.body)
+        return None
 
     def visit_JSList(self, node: js_ast.JSList):
         return node
@@ -139,7 +141,7 @@ class Tranformer(JSNodeVisitor):
 
     def _get_node_info(self, node: js_ast.JSNode) -> Optional[ObjectInfo]:
         if isinstance(node, js_ast.JSName):
-            return get_object_from_expression(self.root_object, self.context_path, node)
+            return get_object_from_node(self.root_object, self.context_path, node)
         if isinstance(node, js_ast.JSAttribute):
             return self._get_attribute_info(node)
 
@@ -147,14 +149,15 @@ class Tranformer(JSNodeVisitor):
         if not isinstance(node.value, js_ast.JSName):
             return
 
-        return get_object_from_expression(self.root_object, self.context_path, node)
+        return get_object_from_node(self.root_object, self.context_path, node)
 
 
-class BodyTransformer(Tranformer):
+class BodyTransformer(Transformer):
+    """Класс преобразует тело модуля"""
     def __init__(
             self,
-            body: [js_ast.JSStatement],
-            context_path: [str],
+            body: List[js_ast.JSStatement],
+            context_path: List[str],
             root_object: ObjectInfo,
     ):
         super().__init__(context_path, root_object)
@@ -165,6 +168,7 @@ class BodyTransformer(Tranformer):
         if new_body:
             self.body = new_body
             return new_body
+        return None
 
     def _visit_js_assign_to_name(self, node: js_ast.JSAssign) -> Optional[js_ast.JSLet]:
         name = node.target.id
@@ -210,15 +214,17 @@ class BodyTransformer(Tranformer):
             self.context_vars.object_dict[module_name] = ReferenceObjectInfo(self.context_path + [module_name], module_info)
 
 
-class ClassTransformer(Tranformer):
+class ClassTransformer(Transformer):
+    """Класс трансформирует объявления класса в объекте"""
     def __init__(self, class_def: js_ast.JSClassDef, context_path: List[str], root_object: ObjectInfo):
         super().__init__(context_path, root_object)
         self.class_def = class_def
 
     def transform(self) -> Optional[js_ast.JSClassDef]:
-        new_body = self.visit(self.class_def.body)
+        new_body = self.visit_list(self.class_def.body)
         if new_body:
             return js_ast.JSClassDef(self.class_def.name, new_body)
+        return None
 
     def visit_JSFunctionDef(self, node: js_ast.JSFunctionDef) -> Optional[js_ast.JSFunctionDef]:
         method_name = node.name

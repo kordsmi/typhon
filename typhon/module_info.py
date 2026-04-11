@@ -9,6 +9,11 @@ from typhon.object_info_serializer import serialize_object_info, deserialize_obj
 
 @dataclass
 class ModuleInfo:
+    """Класс `ModuleInfo` хранит информацию о модуле:
+        - Время обновления
+        - Информацию об объектах
+        - AST JavaScript
+    """
     updated: datetime.datetime = None
     objects: ObjectInfo = None
     js_tree: js_ast.JSNode = None

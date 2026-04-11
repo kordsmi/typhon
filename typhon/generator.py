@@ -1,10 +1,13 @@
 from itertools import chain, repeat
+from typing import Iterable, Callable, Type, Dict
 
 from typhon import js_ast
 from typhon.exceptions import UnsupportedNode
+from typhon.js_ast import JSExpression
 
 
-def generate_js_bin_op(node: js_ast.JSBinOp) -> str:
+def generate_js_bin_op(node: js_ast.JSExpression) -> str:
+    assert isinstance(node, js_ast.JSBinOp)
     left = generate_js_expression(node.left)
     right = generate_js_expression(node.right)
     op = '+' if isinstance(node.op, js_ast.JSAdd) else ''
@@ -15,18 +18,22 @@ def generate_js_keyword(node: js_ast.JSKeyWord) -> str:
     return f'{node.arg}={generate_js_expression(node.value)}'
 
 
-def generate_js_call(node: js_ast.JSCall) -> str:
+def generate_js_call(node: js_ast.JSExpression) -> str:
+    assert isinstance(node, js_ast.JSCall)
     args_str = generate_expression_list(node.args)
     args_str += [generate_js_keyword(keyword) for keyword in node.keywords]
 
     return f'{generate_js_expression(node.func)}({", ".join(args_str)})'
 
 
-def generate_js_name(node: js_ast.JSName):
+def generate_js_name(node: js_ast.JSExpression):
+    assert isinstance(node, js_ast.JSName)
     return node.id
 
 
-def generate_js_constant(node: js_ast.JSConstant):
+def generate_js_constant(node: js_ast.JSExpression):
+    assert isinstance(node, js_ast.JSConstant)
+
     if isinstance(node.value, str):
         return f"'{node.value}'"
     elif node.value is None:
@@ -36,18 +43,20 @@ def generate_js_constant(node: js_ast.JSConstant):
     return str(node.value)
 
 
-def generate_js_list(node: js_ast.JSList) -> str:
+def generate_js_list(node: js_ast.JSExpression) -> str:
+    assert isinstance(node, js_ast.JSList)
     elements = ', '.join(generate_expression_list(node.elts))
     return f'[{elements}]'
 
 
-def generate_expression_list(expr_list: [js_ast.JSExpression]) -> [str]:
+def generate_expression_list(expr_list: Iterable[js_ast.JSExpression]) -> Iterable[str]:
     if expr_list is None:
         return []
     return [generate_js_expression(element) for element in expr_list]
 
 
-def generate_js_dict(node: js_ast.JSDict) -> str:
+def generate_js_dict(node: js_ast.JSExpression) -> str:
+    assert isinstance(node, js_ast.JSDict)
     if node.keys:
         named_args_list = [
             f'{generate_js_expression(key)}: {generate_js_expression(value)}'
@@ -59,26 +68,30 @@ def generate_js_dict(node: js_ast.JSDict) -> str:
     return f'{{{named_args_str}}}'
 
 
-def generate_js_compare(node: js_ast.JSCompare) -> str:
+def generate_js_compare(node: js_ast.JSExpression) -> str:
+    assert isinstance(node, js_ast.JSCompare)
     return f'{generate_js_expression(node.left)} {generate_js_eq(node.op)} {generate_js_expression(node.right)}'
 
 
-def generate_js_subscript(node: js_ast.JSSubscript) -> str:
+def generate_js_subscript(node: js_ast.JSExpression) -> str:
+    assert isinstance(node, js_ast.JSSubscript)
     return f'{generate_js_expression(node.value)}[{generate_js_expression(node.slice)}]'
 
 
-def generate_js_attribute(node: js_ast.JSAttribute) -> str:
+def generate_js_attribute(node: js_ast.JSExpression) -> str:
+    assert isinstance(node, js_ast.JSAttribute)
     return f'{generate_js_name(node.value)}.{node.attr}'
 
 
-def generate_js_new(node: js_ast.JSNew) -> str:
+def generate_js_new(node: js_ast.JSExpression) -> str:
+    assert isinstance(node, js_ast.JSNew)
     args_str = generate_expression_list(node.args)
     args_str += [generate_js_keyword(keyword) for keyword in node.keywords]
 
     return f'new {generate_js_expression(node.class_)}({", ".join(args_str)})'
 
 
-EXPRESSION_GENERATOR_FUNCTIONS = {
+EXPRESSION_GENERATOR_FUNCTIONS: Dict[Type[JSExpression], Callable[[JSExpression], str]] = {
     js_ast.JSBinOp: generate_js_bin_op,
     js_ast.JSCall: generate_js_call,
     js_ast.JSName: generate_js_name,
@@ -93,36 +106,44 @@ EXPRESSION_GENERATOR_FUNCTIONS = {
 
 
 def generate_js_expression(node: js_ast.JSExpression) -> str:
-    generator_function = EXPRESSION_GENERATOR_FUNCTIONS.get(type(node), None)
+    """Генерация выражений"""
+    node_type: Type[JSExpression] = type(node)
+    generator_function: Callable | None = EXPRESSION_GENERATOR_FUNCTIONS.get(node_type)
     if not generator_function:
         raise UnsupportedNode(f'Node {type(node).__name__} not supported yet')
 
     return generator_function(node)
 
 
-def generate_js_assign(node: js_ast.JSAssign) -> str:
+def generate_js_assign(node: js_ast.JSStatement) -> str:
+    assert isinstance(node, js_ast.JSAssign)
     return f'{generate_js_expression(node.target)} = {generate_js_expression(node.value)};'
 
 
-def generate_js_code_expression(node: js_ast.JSCodeExpression) -> str:
+def generate_js_code_expression(node: js_ast.JSStatement) -> str:
+    assert isinstance(node, js_ast.JSCodeExpression)
     return generate_js_expression(node.value) + ';'
 
 
-def generate_js_return(node: js_ast.JSReturn) -> str:
+def generate_js_return(node: js_ast.JSStatement) -> str:
+    assert isinstance(node, js_ast.JSReturn)
     return f'return {generate_js_expression(node.value)};'
 
 
-def generate_js_function_def(node: js_ast.JSFunctionDef) -> str:
+def generate_js_function_def(node: js_ast.JSStatement) -> str:
+    assert isinstance(node, js_ast.JSFunctionDef)
     code_block = generate_code_block(node.body)
     return f'function {node.name}({generate_js_arguments(node.args)}) {code_block}'
 
 
-def generate_js_method_def(node: js_ast.JSFunctionDef) -> str:
+def generate_js_method_def(node: js_ast.JSStatement) -> str:
+    assert isinstance(node, js_ast.JSFunctionDef)
     code_block = generate_code_block(node.body)
     return f'{node.name}({generate_js_arguments(node.args)}) {code_block}'
 
 
-def generate_js_while(node: js_ast.JSWhile) -> str:
+def generate_js_while(node: js_ast.JSStatement) -> str:
+    assert isinstance(node, js_ast.JSWhile)
     test_str = generate_js_expression(node.test)
     while_body = generate_code_block(node.body)
     else_body = ''
@@ -134,7 +155,7 @@ def generate_js_while(node: js_ast.JSWhile) -> str:
 code_block_indent = 0
 
 
-def generate_code_block(body: [js_ast.JSStatement]) -> str:
+def generate_code_block(body: Iterable[js_ast.JSStatement]) -> str:
     global code_block_indent
 
     code_block_indent += 1
@@ -147,17 +168,20 @@ def generate_code_block(body: [js_ast.JSStatement]) -> str:
     return '{\n' + js_body_str + get_indent_str() + '}'
 
 
-def generate_js_if(node: js_ast.JSIf) -> str:
+def generate_js_if(node: js_ast.JSStatement) -> str:
+    assert isinstance(node, js_ast.JSIf)
     if_str = f'if ({generate_js_expression(node.test)}) {generate_code_block(node.body)}'
     else_str = f' else {generate_code_block(node.orelse)}' if node.orelse else ''
     return if_str + else_str
 
 
-def generate_js_throw(node: js_ast.JSThrow) -> str:
+def generate_js_throw(node: js_ast.JSStatement) -> str:
+    assert isinstance(node, js_ast.JSThrow)
     return f'throw {generate_js_expression(node.exc)};'
 
 
-def generate_js_try(node: js_ast.JSTry) -> str:
+def generate_js_try(node: js_ast.JSStatement) -> str:
+    assert isinstance(node, js_ast.JSTry)
     try_str = f'try {generate_code_block(node.body)}'
     catch_str = f' catch (e) {generate_code_block(node.catch)}'
     finally_str = ''
@@ -166,19 +190,23 @@ def generate_js_try(node: js_ast.JSTry) -> str:
     return try_str + catch_str + finally_str
 
 
-def generate_js_continue(node: js_ast.JSContinue) -> str:
+def generate_js_continue(node: js_ast.JSStatement) -> str:
+    assert isinstance(node, js_ast.JSContinue)
     return 'continue;'
 
 
-def generate_js_break(node: js_ast.JSBreak) -> str:
+def generate_js_break(node: js_ast.JSStatement) -> str:
+    assert isinstance(node, js_ast.JSBreak)
     return 'break;'
 
 
-def generate_js_delete(node: js_ast.JSDelete) -> str:
+def generate_js_delete(node: js_ast.JSStatement) -> str:
+    assert isinstance(node, js_ast.JSDelete)
     return f'delete {generate_js_expression(node.target)};'
 
 
-def generate_js_let(node: js_ast.JSLet) -> str:
+def generate_js_let(node: js_ast.JSStatement) -> str:
+    assert isinstance(node, js_ast.JSLet)
     return f'let {generate_js_assign(node.assign)}'
 
 
@@ -189,7 +217,8 @@ def generate_alias(node: js_ast.JSAlias) -> str:
     return f'{node.name} as {node.asname}'
 
 
-def generate_js_import(node: js_ast.JSImport) -> str:
+def generate_js_import(node: js_ast.JSStatement) -> str:
+    assert isinstance(node, js_ast.JSImport)
     if node.names:
         import_names = [generate_alias(alias) for alias in node.names]
         import_names_str = '{' + ', '.join(import_names) + '}'
@@ -199,11 +228,12 @@ def generate_js_import(node: js_ast.JSImport) -> str:
     return f"import {import_names_str} from './{node.module}.js';"
 
 
-def generate_js_class_def(node: js_ast.JSClassDef) -> str:
+def generate_js_class_def(node: js_ast.JSStatement) -> str:
+    assert isinstance(node, js_ast.JSClassDef)
     return f'class {node.name} {generate_code_block(node.body)}'
 
 
-STATEMENT_GENERATOR_FUNCTIONS = {
+STATEMENT_GENERATOR_FUNCTIONS: dict[type[js_ast.JSStatement], Callable[[js_ast.JSStatement], str]] = {
     js_ast.JSAssign: generate_js_assign,
     js_ast.JSCodeExpression: generate_js_code_expression,
     js_ast.JSReturn: generate_js_return,
@@ -227,6 +257,7 @@ def get_indent_str() -> str:
 
 
 def generate_js_statement(node: js_ast.JSStatement) -> str:
+    """Генерация операторов"""
     generator_function = STATEMENT_GENERATOR_FUNCTIONS.get(type(node), None)
     if not generator_function:
         raise UnsupportedNode(f'Node {type(node).__name__} not supported yet')
@@ -239,6 +270,7 @@ def generate_js_arg(node: js_ast.JSArg) -> str:
 
 
 def generate_js_arguments(node: js_ast.JSArguments) -> str:
+    """Генерация аргументов функций"""
     class Empty:
         pass
 
@@ -260,7 +292,7 @@ def generate_js_arguments(node: js_ast.JSArguments) -> str:
     return ', '.join(args)
 
 
-def generate_js_body(nodes: [js_ast.JSStatement]) -> str:
+def generate_js_body(nodes: Iterable[js_ast.JSStatement]) -> str:
     result = [generate_js_statement(node) for node in nodes if not isinstance(node, js_ast.JSNop)]
     return '\n'.join(result)
 
@@ -270,6 +302,7 @@ def generate_js_eq(node: js_ast.JSEq) -> str:
 
 
 def generate_js_module(node: js_ast.JSModule) -> str:
+    """Генерация модуля"""
     result = ''
     if node.export:
         result = generate_js_export(node.export) + '\n\n'

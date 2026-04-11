@@ -3,6 +3,10 @@ from typhon.types import ModulePath
 
 
 class SourceManager:
+    """Класс `SourceManager` управляет путями к исходным файлам:
+        - Определение путей к пакетам
+        - Проверка, является ли модуль пакетом (наличие `__init__.py`)
+    """
     def __init__(self, project_path: str = None):
         self.project_path = project_path or '.'
 

@@ -9,6 +9,12 @@ from typhon.types import ModulePath
 
 
 class ModuleTranspiler:
+    """Класс отвечает за процесс транспиляции модуля:
+        - Парсинг исходного кода Python в AST
+        - Транспиляция AST Python в AST JavaScript
+        - Преобразование AST JavaScript через `BodyTransformer`
+        - Генерация финального JS-кода
+    """
     def __init__(self, source: str, root_object: ObjectInfo, module_path: ModulePath):
         self.source = source
         self.py_tree = None

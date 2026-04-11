@@ -62,7 +62,9 @@ def transpile_subscript(node: ast.Subscript) -> js_ast.JSSubscript:
 
 
 def transpile_attribute(node: ast.Attribute) -> js_ast.JSAttribute:
-    return js_ast.JSAttribute(value=transpile_name(node.value), attr=node.attr)
+    node_value = node.value
+    assert isinstance(node_value, ast.Name)
+    return js_ast.JSAttribute(value=transpile_name(node_value), attr=node.attr)
 
 
 EXPRESSION_TRANSPILER_FUNCTIONS = {
@@ -82,6 +84,7 @@ EXPRESSION_TRANSPILER_FUNCTIONS = {
 
 
 def transpile_expression(node: ast.expr) -> js_ast.JSExpression:
+    """Транспиляция выражений"""
     transpiler_function = EXPRESSION_TRANSPILER_FUNCTIONS.get(type(node), None)
     if not transpiler_function:
         raise InvalidNode(node=node)
@@ -135,8 +138,10 @@ def transpile_raise(node: ast.Raise) -> js_ast.JSThrow:
 def transpile_try(node: ast.Try) -> js_ast.JSTry:
     prev_if = transpile_body(node.orelse)
     for exception_handler in reversed(node.handlers):
+        exception_type = exception_handler.type
+        assert isinstance(exception_type, ast.Name)
         if_statement = js_ast.JSIf(
-            test=js_ast.JSCompare(js_ast.JSName('e.name'), js_ast.JSEq(), js_ast.JSName(exception_handler.type.id)),
+            test=js_ast.JSCompare(js_ast.JSName('e.name'), js_ast.JSEq(), js_ast.JSName(exception_type.id)),
             body=transpile_body(exception_handler.body),
             orelse=prev_if
         )
@@ -199,6 +204,7 @@ STATEMENT_TRANSPILER_FUNCTIONS = {
 
 
 def transpile_statement(node: ast.stmt) -> js_ast.JSStatement:
+    """Транспиляция операторов"""
     statement_transpiler = STATEMENT_TRANSPILER_FUNCTIONS.get(type(node))
     if not statement_transpiler:
         raise InvalidNode(node=node)
@@ -209,15 +215,16 @@ def transpile_arg(node: ast.arg) -> js_ast.JSArg:
     return js_ast.JSArg(arg=node.arg)
 
 
-def transpile_arg_list(nodes: [ast.arg]) -> Optional[List[js_ast.JSArg]]:
+def transpile_arg_list(nodes: List[ast.arg]) -> Optional[List[js_ast.JSArg]]:
     return [transpile_arg(arg) for arg in nodes] if nodes else None
 
 
-def transpile_expression_list(expressions: [ast.expr]) -> Optional[List[js_ast.JSExpression]]:
+def transpile_expression_list(expressions: List[ast.expr]) -> Optional[List[js_ast.JSExpression]]:
     return [transpile_expression(expr) for expr in expressions] if expressions else None
 
 
 def transpile_arguments(node: ast.arguments) -> js_ast.JSArguments:
+    """Транспиляция аргументов функций"""
     js_args = transpile_arg_list(node.args)
     defaults = transpile_expression_list(node.defaults)
     vararg = transpile_arg(node.vararg) if node.vararg else None
@@ -228,7 +235,7 @@ def transpile_arguments(node: ast.arguments) -> js_ast.JSArguments:
                               kwonlyargs=kwonlyargs, kw_defaults=kw_defaults, kwarg=kwarg)
 
 
-def transpile_body(node: [ast.stmt]) -> [js_ast.JSStatement]:
+def transpile_body(node: List[ast.stmt]) -> List[js_ast.JSStatement]:
     result = []
     for expr in node:
         if isinstance(expr, ast.Pass):
@@ -241,9 +248,10 @@ def transpile_body(node: [ast.stmt]) -> [js_ast.JSStatement]:
     return result
 
 
-def transpile_eq(node: ast.Eq) -> js_ast.JSEq:
+def transpile_eq(node: ast.cmpop) -> js_ast.JSEq:
     return js_ast.JSEq()
 
 
 def transpile_module(node: ast.Module) -> js_ast.JSModule:
+    """Точка входа для транспиляции модуля"""
     return js_ast.JSModule(transpile_body(node.body))

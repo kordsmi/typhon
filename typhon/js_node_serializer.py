@@ -1,12 +1,16 @@
-from typing import Union
+from typing import Union, TypeAlias
 
 from typhon import js_ast
 
 
-def serialize_js_node(node: js_ast.JSNode) -> dict:
+FieldValueType: TypeAlias = Union[str, int, list, dict]
+
+
+def serialize_js_node(node: js_ast.JSNode) -> dict[str, FieldValueType]:
+    """Сериализация узла в словарь"""
     fields = {name: serialize_field(getattr(node, name)) for name in node._fields}
 
-    result = {
+    result: dict[str, FieldValueType] = {
         'id': id(node),
         'class': node.__class__.__name__,
     }
@@ -16,7 +20,7 @@ def serialize_js_node(node: js_ast.JSNode) -> dict:
     return result
 
 
-def serialize_field(field_value: Union[str, int, list, js_ast.JSNode]) -> Union[str, int, list, dict]:
+def serialize_field(field_value: Union[str, int, list, js_ast.JSNode]) -> FieldValueType:
     if isinstance(field_value, list):
         return [serialize_field(item) for item in field_value]
     elif isinstance(field_value, js_ast.JSNode):
@@ -25,6 +29,7 @@ def serialize_field(field_value: Union[str, int, list, js_ast.JSNode]) -> Union[
 
 
 class JSNodeDeserializer:
+    """Десериализация узла из словаря"""
     def __init__(self, data: dict):
         self.data = data
 

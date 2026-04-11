@@ -14,7 +14,7 @@ class ImportCollector(ast.NodeVisitor):
         self.imports = []
 
     def visit_Import(self, node: Import) -> Any:
-        names: [ast.alias] = node.names
+        names: list[ast.alias] = node.names
         for name in names:
             module_parts = name.name.split('.')
             module_path = []
@@ -36,6 +36,11 @@ class ImportCollector(ast.NodeVisitor):
 
 
 class ImportGraph:
+    """Класс `ImportGraph` строит граф зависимостей между модулями:
+        - Сбор импортов из исходного кода
+        - Построение графа зависимостей
+        - Обнаружение циклических импортов
+    """
     def __init__(self, source: str, source_manager: SourceManager):
         self.source = source
         self.graph = {}
@@ -68,7 +73,7 @@ class ImportGraph:
         self.graph[module_path.module_path] = imports
         self.queue.extend(imports)
 
-    def get_imports(self, source) -> [str]:
+    def get_imports(self, source) -> list[str]:
         py_ast = ast.parse(source)
         import_collector = ImportCollector()
         import_collector.visit(py_ast)

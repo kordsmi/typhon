@@ -10,6 +10,12 @@ from typhon.module_transpiler import ModuleTranspiler
 
 
 class Project:
+    """Центральный компонент системы транспиляции. Он отвечает за:
+        - Управление графом импортов
+        - Управление кэшем и исходными файлами
+        - Транспиляцию модулей и связанных с ними модулей
+        - Управление информацией о модулях
+    """
     def __init__(self, source_path: str = None):
         self.import_graph = {}
         self.source_manager = SourceManager(source_path)

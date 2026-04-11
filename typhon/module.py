@@ -10,6 +10,12 @@ from typhon.types import ModulePath
 
 
 class Module:
+    """Класс представляет собой единицу транспиляции. Он отвечает за:
+        - Управление путями к файлам (исходным, целевым JS-файлам, файлам AST)
+        - Чтение исходного кода
+        - Сохранение результатов транспиляции (JS-кода, AST, информации о модуле)
+        - Кэширование через директорию `.ty_cache`
+    """
     def __init__(self, module_path: ModulePath = None, source_manager: SourceManager = None):
         self.module_path = module_path or ModulePath('__main__')
         self.module_name = self.module_path.name
