@@ -1,10 +1,7 @@
-from itertools import chain
-from typing import Optional, List
+from typing import Optional, List, Union, Any
 
 from typhon import js_ast
-from typhon.context import get_context_object, get_object
-from typhon.object_info import ObjectInfo, TypeObjectInfo, FunctionObjectInfo, ConstantObjectInfo, ReferenceObjectInfo
-from typhon.js_visitor import JSNodeVisitor
+from typhon.object_collector import ObjectInfo, ObjectConstant, get_object_by_path, ObjectClass
 
 
 def get_attribute_target(from_object: ObjectInfo, node: js_ast.JSAttribute) -> ObjectInfo:
@@ -18,37 +15,260 @@ def get_attribute_target(from_object: ObjectInfo, node: js_ast.JSAttribute) -> O
 
 def get_object_from_node(
         from_object: ObjectInfo,
-        context_path: List[str],
         node: js_ast.JSNode,
 ) -> ObjectInfo:
     if isinstance(node, js_ast.JSName):
-        source_object = get_object(from_object, context_path, node.id)
+        source_object = get_object_by_path(from_object, node.id)
         return source_object
     if isinstance(node, js_ast.JSNew):
-        class_ = get_object_from_node(from_object, context_path, node.class_)
-        object_info = ObjectInfo(None)
+        class_ = get_object_from_node(from_object, node.class_)
+        object_info = ObjectInfo()
         object_info.object_class = class_
         return object_info
     if isinstance(node, js_ast.JSConstant):
-        return ConstantObjectInfo(None, node.value)
+        return ObjectConstant(node.value)
     if isinstance(node, js_ast.JSAttribute):
-        object_info = get_object_from_node(from_object, context_path, node.value)
-        return get_object(from_object, object_info.context_path, node.attr)
+        object_info = get_object_from_node(from_object, node.value)
+        return get_object_by_path(object_info, node.attr)
     if isinstance(node, js_ast.JSArg):
-        return ObjectInfo(None)
+        return ObjectInfo()
 
-    return ObjectInfo(None)
+    return ObjectInfo()
 
 
-class Transformer(JSNodeVisitor):
+# def get_object_info_by_node(
+#         context_path: List[str],
+#         node: js_ast.JSNode,
+# ) -> ObjectInfo:
+#     if isinstance(node, js_ast.JSName):
+#         return NewReferenceObjectInfo(context_path, node.id)
+#     if isinstance(node, js_ast.JSNew):
+#         class_ = get_object_info_by_node(context_path, node.class_)
+#         return ObjectInfo(context_path, object_class=class_)
+#     if isinstance(node, js_ast.JSConstant):
+#         return ConstantObjectInfo(context_path, node.value)
+#     if isinstance(node, js_ast.JSAttribute):
+#         return NewReferenceObjectInfo(context_path, node.attr)
+#     if isinstance(node, js_ast.JSArg):
+#         return NewReferenceObjectInfo(context_path, node.arg)
+#
+#     return ObjectInfo(context_path)
+
+
+# class ObjectCollector(JSNodeVisitor):
+#     def __init__(self):
+#         self.module_info = ObjectInfo([], None)
+#
+#     # def visit_JSImport(self, node: js_ast.JSImport):
+#     #     module_name = node.alias or node.module
+#     #     module_path = tuple(module_name.split('.'))
+#     #     module_info = self.module_info
+#     #     for path_item in module_path:
+#     #         module_info = module_info.object_dict[path_item]
+#     #
+#     #     if node.names:
+#     #         # Добавление импортируемых объектов
+#     #         for alias in node.names:
+#     #             object_name = alias.asname or alias.name
+#     #             object_info = module_info.object_dict[alias.name]
+#     #             if not isinstance(object_info, ConstantObjectInfo):
+#     #                 object_info = ReferenceObjectInfo(module_info.context_path + [object_name], object_info)
+#     #             module_info.object_dict[object_name] = object_info
+#     #     else:
+#     #         # Добавление модуля как объекта
+#     #         module_name = module_path[-1]
+#     #         object_info = ReferenceObjectInfo(module_info.context_path + [module_name], module_info)
+#     #         module_info.context_vars.object_dict[module_name] = object_info
+#
+#     # def visit_JSCall(self, node: js_ast.JSCall):
+#     #     func: js_ast.JSExpression = node.func
+#     #     id_info = None
+#     #     if isinstance(func, js_ast.JSName):
+#     #         # Вызов функции
+#     #         id_info = get_object_from_node(self.module_info, self.module_info.context_path, func)
+#     #     elif isinstance(func, js_ast.JSAttribute):
+#     #         # Вызов метода
+#     #         node_attr: js_ast.JSAttribute = func
+#     #         if isinstance(node_attr.value, js_ast.JSName):
+#     #             id_info = get_object_from_node(self.module_info, self.module_info.context_path, node_attr)
+#
+#     def visit_JSFunctionDef(self, node: js_ast.JSFunctionDef):
+#         func_name = node.name
+#
+#         function_context = self.module_info.context_path + [func_name]
+#         function_info = FunctionObjectInfo(function_context)
+#         self.module_info.object_dict[func_name] = function_info
+#
+#         new_args = self.visit(node.args) or node.args
+#         # original_context_path = self.module_info.context_path
+#         # self.context_path = function_context
+#         # try:
+#         # for arg in chain(new_args.args or [], new_args.kwonlyargs or []):
+#         #     arg_name = arg.arg
+#         #     self._set_context_variable(function_info, arg_name, arg)
+#         # finally:
+#         #     self.context_path = original_context_path
+#
+#         body_transformer = BodyTransformer(node.body, function_context, self.root_object)
+#         new_body = body_transformer.transform()
+#         if new_args or new_body:
+#             return js_ast.JSFunctionDef(node.name, new_args or node.args, new_body or node.body)
+#         return None
+#
+#     # def _set_context_variable(
+#     #         self,
+#     #         target_context: ObjectInfo,
+#     #         target_name: str,
+#     #         node: js_ast.JSNode,
+#     # ) -> ObjectInfo:
+#         # value_context = get_object_from_node(self.module_info, target_context.context_path, node)
+#         # if value_context.context_path:
+#         #     if isinstance(value_context, ConstantObjectInfo):
+#         #         value_context = ConstantObjectInfo(target_context.context_path + [target_name], value_context.value)
+#         #     else:
+#         #         value_context = ReferenceObjectInfo(target_context.context_path + [target_name], value_context)
+#         # else:
+#         #     value_context.context_path = target_context.context_path + [target_name]
+#         # target_context.object_dict[target_name] = value_context
+#         # return value_context
+#         # object_info = get_object_info_by_node(target_context.context_path, node)
+#         # target_context.object_dict[target_name] = object_info
+#         # return object_info
+
+
+def _one_of(*args):
+    for item in args:
+        if item is not None:
+            return True
+    return False
+
+
+def _or(item1, item2) -> Any:
+    if item1 is not None:
+        return item1
+    return item2
+
+
+class Transformer:
     """Базовый класс для преобразования AST JavaScript"""
     def __init__(self, context_path: List[str], root_object: ObjectInfo):
         self.context_path = context_path
         self.root_object = root_object
-        self.context_vars: ObjectInfo = get_context_object(root_object, context_path)
+        self.context_vars: ObjectInfo = get_object_by_path(root_object, '.'.join(context_path))
+        if self.context_vars is None:
+            self.context_vars = self.root_object
+
+
+    """Базовый класс для посещения узлов AST JavaScript"""
+    def visit(self, node: js_ast.JSNode | List[js_ast.JSStatement]) \
+            -> Optional[Union[js_ast.JSNode, List[js_ast.JSNode]]]:
+        if isinstance(node, list):
+            return self.visit_list(node)
+
+        method_name = f'visit_{type(node).__name__}'
+        method = getattr(self, method_name)
+        return method(node)
+
+    def visit_list(self, node_list: list[js_ast.JSStatement]) -> Optional[List[js_ast.JSStatement]]:
+        new_list = []
+        modified = False
+        for item in node_list:
+            new_item = self.visit(item)
+            if new_item:
+                modified = True
+                if isinstance(new_item, js_ast.JSNop):
+                    continue
+                new_list.append(new_item)
+            else:
+                new_list.append(item)
+
+        if modified:
+            return new_list
+
+        return None
+
+    def visit_JSLet(self, node: js_ast.JSLet) -> Optional[js_ast.JSLet]:
+        new_assign: js_ast.JSAssign | None = self.visit(node.assign)
+        if new_assign:
+            return js_ast.JSLet(new_assign)
+        return None
+
+    def visit_JSConstant(self, node: js_ast.JSConstant) -> Optional[js_ast.JSConstant]:
+        pass
+
+    def visit_JSArguments(self, node: js_ast.JSArguments) -> Optional['js_ast.JSArguments']:
+        args = node.args
+        new_args = self.visit(args) if args else None
+        defaults = node.defaults
+        new_defaults = self.visit(defaults) if defaults else None
+        vararg = node.vararg
+        new_vararg = self.visit(vararg) if vararg else None
+        kwonlyargs = node.kwonlyargs
+        new_kwonlyargs = self.visit(kwonlyargs) if kwonlyargs else None
+        kw_defaults = node.kw_defaults
+        new_kw_defaults = self.visit(kw_defaults) if kw_defaults else None
+        kwarg = node.kwarg
+        new_kwarg = self.visit(kwarg) if kwarg else None
+
+        if _one_of(new_args, new_defaults, new_vararg, new_kwonlyargs, new_kw_defaults, new_kwarg):
+            return js_ast.JSArguments(_or(new_args, args), _or(new_defaults, defaults), _or(new_vararg, vararg),
+                                      _or(new_kwonlyargs, kwonlyargs), _or(new_kw_defaults, kw_defaults),
+                                      _or(new_kwarg, kwarg))
+        return None
+
+    def visit_JSAlias(self, node: js_ast.JSAlias) -> Optional[js_ast.JSAlias]:
+        pass
+
+    def visit_JSArg(self, node: js_ast.JSArg) -> Optional[js_ast.JSArg]:
+        if node.arg == 'self':
+            return js_ast.JSNop()
+        return None
+
+    def visit_JSNop(self, node: js_ast.JSNop) -> Optional[js_ast.JSNop]:
+        pass
+
+    def visit_JSCodeExpression(self, node: js_ast.JSCodeExpression) -> Optional[js_ast.JSCodeExpression]:
+        new_value = self.visit(node.value)
+        if not new_value:
+            return None
+
+        assert isinstance(new_value, (js_ast.JSExpression, js_ast.JSStatement))
+        return js_ast.JSCodeExpression(new_value)
+
+    def visit_JSStatement(self, node: js_ast.JSStatement) -> Optional[js_ast.JSStatement]:
+        return None
+
+    def visit_JSExpression(self, node: js_ast.JSExpression) -> Optional[js_ast.JSExpression]:
+        return None
+
+    def visit_JSBinOp(self, node: js_ast.JSBinOp) -> Optional[js_ast.JSBinOp]:
+        pass
+
+    def visit_JSAttribute(self, node: js_ast.JSAttribute) -> Optional[js_ast.JSAttribute]:
+        new_value = self.visit(node.value)
+        if new_value:
+            return js_ast.JSAttribute(new_value or node.value, node.attr)
+        return None
+
+    def visit_JSKeyWord(self, node: js_ast.JSKeyWord) -> Optional[js_ast.JSKeyWord]:
+        new_value = self.visit(node.value)
+        if new_value:
+            return js_ast.JSKeyWord(arg=node.arg, value=_or(new_value, node.value))
+        return None
+
+    def visit_JSReturn(self, node: js_ast.JSReturn) -> Optional[js_ast.JSReturn]:
+        new_value = self.visit_JSExpression(node.value)
+        if new_value:
+            return js_ast.JSReturn(new_value)
+        return None
 
     def visit_JSAssign(self, node: js_ast.JSAssign) -> Optional[js_ast.JSAssign]:
-        visited_node = super().visit_JSAssign(node)
+        new_target = self.visit(node.target)
+        new_value = self.visit(node.value)
+        visited_node = None
+        if new_target or new_value:
+            visited_node = js_ast.JSAssign(new_target or node.target, new_value or node.value)
+
         node = visited_node or node
         new_node = None
         if isinstance(node.target, js_ast.JSName):
@@ -63,43 +283,41 @@ class Transformer(JSNodeVisitor):
             target_name: str,
             node: js_ast.JSNode,
     ) -> Optional[ObjectInfo]:
-        if target_context:
-            value_context = get_object_from_node(self.root_object, target_context.context_path, node)
-            if value_context.context_path:
-                if isinstance(value_context, ConstantObjectInfo):
-                    value_context = ConstantObjectInfo(target_context.context_path + [target_name], value_context.value)
-                else:
-                    value_context = ReferenceObjectInfo(target_context.context_path + [target_name], value_context)
-            else:
-                value_context.context_path = target_context.context_path + [target_name]
-            target_context.object_dict[target_name] = value_context
-            return value_context
+        value_context = get_object_from_node(target_context, node)
+        target_context.objects[target_name] = value_context
+        return value_context
 
     def _visit_js_assign_to_name(self, node: js_ast.JSAssign) -> Optional[js_ast.JSLet]:
-        self._set_context_variable(self.context_vars, node.target.id, node.value)
+        pass
 
     def _visit_js_assign_to_attribute(self, node: js_ast.JSAssign) -> Optional[js_ast.JSNop]:
         result = None
         target_name = node.target.attr
 
+        target_object = get_object_from_node(self.context_vars, node.target.value)
+        value_object = get_object_from_node(self.context_vars, node.value)
         if target_name == '__ty_alias__':
             result = js_ast.JSNop()
-            target_context = self._set_context_variable(self.root_object, node.target.value.id, node)
-            self._set_context_variable(target_context, target_name, node)
-        else:
-            target_context = get_attribute_target(self.context_vars, node.target)
-        self._set_context_variable(target_context, target_name, node.value)
+        target_object.objects[target_name] = value_object
 
         return result
 
     def visit_JSName(self, node: js_ast.JSName) -> Optional[js_ast.JSName]:
-        var_name = node.id
-        object_info = get_object(self.root_object, self.context_path, var_name)
-        if object_info and '__ty_alias__' in object_info.object_dict:
-            return js_ast.JSName(object_info.object_dict['__ty_alias__'].value)
+        object_info = get_object_from_node(self.context_vars, node)
+        if object_info and '__ty_alias__' in object_info.objects:
+            target_object_name = object_info.objects['__ty_alias__'].object_value
+            if not target_object_name in self.context_vars.objects:
+                self.context_vars.objects[target_object_name] = object_info
+            return js_ast.JSName(target_object_name)
+        return None
 
     def visit_JSCall(self, node: js_ast.JSCall) -> Optional[js_ast.JSCall or js_ast.JSNew]:
-        visited_node = super().visit_JSCall(node)
+        new_func = self.visit(node.func)
+        new_args = self.visit(node.args) if node.args else None
+        new_keywords = self.visit(node.keywords) if node.keywords else None
+        visited_node = None
+        if new_func or new_args or new_keywords:
+            visited_node = js_ast.JSCall(new_func or node.func, new_args or node.args, new_keywords or node.keywords)
         node = visited_node or node
 
         new_node = self._check_and_transform_call_to_new(node)
@@ -112,18 +330,8 @@ class Transformer(JSNodeVisitor):
         func_name = node.name
 
         function_context = self.context_path + [func_name]
-        function_info = FunctionObjectInfo(function_context)
-        self.context_vars.object_dict[func_name] = function_info
 
         new_args = self.visit(node.args) or node.args
-        original_context_path = self.context_path
-        self.context_path = function_context
-        try:
-            for arg in chain(new_args.args or [], new_args.kwonlyargs or []):
-                arg_name = arg.arg
-                self._set_context_variable(function_info, arg_name, arg)
-        finally:
-            self.context_path = original_context_path
 
         body_transformer = BodyTransformer(node.body, function_context, self.root_object)
         new_body = body_transformer.transform()
@@ -134,22 +342,14 @@ class Transformer(JSNodeVisitor):
     def visit_JSList(self, node: js_ast.JSList):
         return node
 
+    def visit_JSIf(self, node: js_ast.JSIf):
+        return None
+
     def _check_and_transform_call_to_new(self, node: js_ast.JSCall) -> Optional[js_ast.JSNew]:
-        id_info = self._get_node_info(node.func)
-        if isinstance(id_info, TypeObjectInfo):
+        id_info = get_object_from_node(self.context_vars, node.func)
+        if isinstance(id_info, ObjectClass):
             return js_ast.JSNew(class_=node.func, args=node.args, keywords=node.keywords)
-
-    def _get_node_info(self, node: js_ast.JSNode) -> Optional[ObjectInfo]:
-        if isinstance(node, js_ast.JSName):
-            return get_object_from_node(self.root_object, self.context_path, node)
-        if isinstance(node, js_ast.JSAttribute):
-            return self._get_attribute_info(node)
-
-    def _get_attribute_info(self, node: js_ast.JSAttribute) -> Optional[ObjectInfo]:
-        if not isinstance(node.value, js_ast.JSName):
-            return
-
-        return get_object_from_node(self.root_object, self.context_path, node)
+        return None
 
 
 class BodyTransformer(Transformer):
@@ -162,6 +362,7 @@ class BodyTransformer(Transformer):
     ):
         super().__init__(context_path, root_object)
         self.body = body
+        self.body_vars = set()
 
     def transform(self):
         new_body = self.visit(self.body)
@@ -173,45 +374,34 @@ class BodyTransformer(Transformer):
     def _visit_js_assign_to_name(self, node: js_ast.JSAssign) -> Optional[js_ast.JSLet]:
         name = node.target.id
         new_node = None
-        if not name in self.context_vars.object_dict:
+        if not name in self.body_vars:
             new_node = js_ast.JSLet(node)
+            self.body_vars.add(name)
 
-        self._set_context_variable(self.context_vars, node.target.id, node.value)
+        value_object = get_object_from_node(self.context_vars, node.value)
+        self.context_vars.objects[node.target.id] = value_object
         return new_node
 
     def visit_JSClassDef(self, node: js_ast.JSClassDef) -> Optional['js_ast.JSClassDef']:
         class_context = self.context_path + [node.name]
-        class_object = TypeObjectInfo(class_context)
-        self.context_vars.object_dict[node.name] = class_object
         class_transformer = ClassTransformer(node, class_context, self.root_object)
         new_class_def = class_transformer.transform()
-        class_object.node = new_class_def
         return new_class_def
 
     def visit_JSImport(self, node: js_ast.JSImport) -> Optional[js_ast.JSImport]:
-        visited_node = super().visit_JSImport(node)
-        self._add_import_info(visited_node or node)
+        names = []
+        for name in node.names:
+            new_name = self.visit_JSAlias(name)
+            if new_name:
+                names.append(new_name)
+            else:
+                names.append(name)
+
+        visited_node = None
+        if names:
+            visited_node = js_ast.JSImport(node.module, names, node.alias)
+
         return visited_node
-
-    def _add_import_info(self, node: js_ast.JSImport):
-        module_name = node.alias or node.module
-        module_path = tuple(module_name.split('.'))
-        module_info = self.root_object
-        for path_item in module_path:
-            module_info = module_info.object_dict[path_item]
-
-        if node.names:
-            # Добавление импортируемых объектов
-            for alias in node.names:
-                object_name = alias.asname or alias.name
-                object_info = module_info.object_dict[alias.name]
-                if not isinstance(object_info, ConstantObjectInfo):
-                    object_info = ReferenceObjectInfo(self.context_path + [object_name], object_info)
-                self.context_vars.object_dict[object_name] = object_info
-        else:
-            # Добавление модуля как объекта
-            module_name = module_path[-1]
-            self.context_vars.object_dict[module_name] = ReferenceObjectInfo(self.context_path + [module_name], module_info)
 
 
 class ClassTransformer(Transformer):
@@ -233,25 +423,6 @@ class ClassTransformer(Transformer):
 
         new_args = self.visit(node.args) or node.args
         method_context = self.context_path + [method_name]
-        function_info = FunctionObjectInfo(method_context)
-        self.context_vars.object_dict[method_name] = function_info
-
-        original_context_path = self.context_path
-        self.context_path = method_context
-        try:
-            for arg in chain(new_args.args or [], new_args.kwonlyargs or []):
-                arg_name = arg.arg
-                self._set_context_variable(function_info, arg_name, arg)
-
-            if new_args.args:
-                instance_arg = new_args.args[0]
-                new_args = js_ast.JSArguments(new_args.args[1:], new_args.defaults, new_args.vararg, new_args.kwonlyargs,
-                                              new_args.kw_defaults, new_args.kwarg)
-                self._set_context_variable(function_info.object_dict[instance_arg.arg], '__ty_alias__',
-                                           js_ast.JSConstant('this'))
-                self._set_context_variable(function_info, 'this', instance_arg)
-        finally:
-            self.context_path = original_context_path
 
         body_transformer = BodyTransformer(node.body, method_context, self.root_object)
         new_body = body_transformer.transform()

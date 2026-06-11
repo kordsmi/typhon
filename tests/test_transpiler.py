@@ -4,16 +4,16 @@ import pytest
 
 from typhon import js_ast
 from typhon.exceptions import InvalidNode
-from typhon.transpiler import transpile_bin_op, transpile_call, transpile_assign, transpile_expression, \
-    transpile_arg, transpile_arguments, transpile_statement, transpile_function_def, transpile_return, \
-    transpile_arg_list, transpile_expression_list, transpile_body, transpile_constant, transpile_eq, transpile_module
+from typhon.transpiler import convert_bin_op, convert_call, convert_assign, convert_expression, \
+    convert_arg, convert_arguments, convert_statement, convert_function_def, convert_return, \
+    convert_arg_list, convert_expression_list, convert_body, convert_constant, convert_eq, convert_ast
 
 
 def test_transpile_multiple_expressions():
     src = '''a = 1
 print('a + 2 = ', a + 2)'''
     py_tree = ast.parse(src)
-    js_tree = transpile_module(py_tree)
+    js_tree = convert_ast(py_tree)
 
     expected = js_ast.JSModule(body=[
         js_ast.JSAssign(target=js_ast.JSName(id='a'), value=js_ast.JSConstant(value=1)),
@@ -29,17 +29,17 @@ def test_transpile_function():
     src = '''def foo(a):
     return a'''
     py_tree = ast.parse(src)
-    js_tree = transpile_module(py_tree)
+    js_tree = convert_ast(py_tree)
 
-    expected = js_ast.JSModule([transpile_function_def(py_tree.body[0])])
+    expected = js_ast.JSModule([convert_function_def(py_tree.body[0])])
     assert js_tree == expected
-    assert js_tree.body[0].body[0] == transpile_return(py_tree.body[0].body[0])
+    assert js_tree.body[0].body[0] == convert_return(py_tree.body[0].body[0])
 
 
 def test_transpile_set_variable__int():
     assign_node = _create_assign_statement('a', ast.Constant(value='sample'))
 
-    result = transpile_assign(assign_node)
+    result = convert_assign(assign_node)
 
     expected = js_ast.JSAssign(
         target=js_ast.JSName('a'),
@@ -58,11 +58,11 @@ def test_transpile_set_variable__expression():
         )
     )
 
-    result = transpile_assign(assign_node)
+    result = convert_assign(assign_node)
 
     expected = js_ast.JSAssign(
         target=js_ast.JSName('b'),
-        value=transpile_bin_op(assign_node.value)
+        value=convert_bin_op(assign_node.value)
     )
     assert result == expected
 
@@ -73,7 +73,7 @@ def test_transpile_set_variable__to_subscript():
         value=ast.Constant(value=1),
     )
 
-    result = transpile_assign(assign_node)
+    result = convert_assign(assign_node)
 
     expected = js_ast.JSAssign(
         target=js_ast.JSSubscript(js_ast.JSName('a'), js_ast.JSName('c')),
@@ -85,7 +85,7 @@ def test_transpile_set_variable__to_subscript():
 def test_transpile_bin_op():
     bin_op_node = ast.BinOp(left=ast.Constant(value=1), op=ast.Add(), right=ast.Constant(value=2))
 
-    result = transpile_bin_op(bin_op_node)
+    result = convert_bin_op(bin_op_node)
 
     assert isinstance(result, js_ast.JSBinOp)
     assert isinstance(result.left, js_ast.JSConstant)
@@ -98,7 +98,7 @@ def test_transpile_bin_op():
 def test_transpile_call():
     call_node = ast.Call(func=ast.Name(id='test', ctx=ast.Load()))
 
-    result = transpile_call(call_node)
+    result = convert_call(call_node)
 
     assert isinstance(result,  js_ast.JSCall)
     assert result.func.id == 'test'
@@ -107,7 +107,7 @@ def test_transpile_call():
 def test_transpile_call__method():
     call_node = ast.Call(func=ast.Attribute(value=ast.Name(id='test', ctx=ast.Load()), attr='method'))
 
-    result = transpile_call(call_node)
+    result = convert_call(call_node)
 
     expected = js_ast.JSCall(func=js_ast.JSAttribute(js_ast.JSName('test'), attr='method'))
     assert result == expected
@@ -116,7 +116,7 @@ def test_transpile_call__method():
 def test_transpile_call__with_args():
     call_node = ast.Call(func=ast.Name(id='test', ctx=ast.Load()), args=[ast.Constant(value=1), ast.Name(id='a')])
 
-    result = transpile_call(call_node)
+    result = convert_call(call_node)
 
     expected = js_ast.JSCall(func=js_ast.JSName('test'), args=[js_ast.JSConstant(value=1), js_ast.JSName(id='a')])
     assert result == expected
@@ -132,7 +132,7 @@ def test_transpile_call__with_keywords():
         ]
     )
 
-    result = transpile_call(call_node)
+    result = convert_call(call_node)
 
     expected = js_ast.JSCall(
         func=js_ast.JSName('test'),
@@ -150,7 +150,7 @@ def test_transpile_call__with_expression():
         args=[ast.BinOp(left=ast.Constant(value=1), op=ast.Add(), right=ast.Constant(value=2))]
     )
 
-    result = transpile_call(call_node)
+    result = convert_call(call_node)
 
     expected = js_ast.JSCall(
         func=js_ast.JSName('test'),
@@ -170,7 +170,7 @@ def test_transpile_expression__unknown_node():
         pass
 
     with pytest.raises(InvalidNode) as e:
-        transpile_expression(UnknownNode())
+        convert_expression(UnknownNode())
 
     assert isinstance(e.value.node, UnknownNode)
 
@@ -178,7 +178,7 @@ def test_transpile_expression__unknown_node():
 def test_transpile_expression__list():
     node = ast.List(elts=[ast.Constant(value=1), ast.Constant(value=2)])
 
-    js_node = transpile_expression(node)
+    js_node = convert_expression(node)
 
     expected = js_ast.JSList(elts=[js_ast.JSConstant(1), js_ast.JSConstant(2)])
     assert js_node == expected
@@ -187,7 +187,7 @@ def test_transpile_expression__list():
 def test_transpile_expression__tuple():
     node = ast.Tuple(elts=[ast.Constant(value=1), ast.Constant(value=2)])
 
-    js_node = transpile_expression(node)
+    js_node = convert_expression(node)
 
     expected = js_ast.JSList(elts=[js_ast.JSConstant(1), js_ast.JSConstant(2)])
     assert js_node == expected
@@ -196,7 +196,7 @@ def test_transpile_expression__tuple():
 def test_transpile_expression__set():
     node = ast.Set(elts=[ast.Constant(value=1), ast.Constant(value=2)])
 
-    js_node = transpile_expression(node)
+    js_node = convert_expression(node)
 
     expected = js_ast.JSList(elts=[js_ast.JSConstant(1), js_ast.JSConstant(2)])
     assert js_node == expected
@@ -208,7 +208,7 @@ def test_transpile_expression__dict():
         values=[ast.Constant(value=1), ast.Constant(value=2)]
     )
 
-    js_node = transpile_expression(node)
+    js_node = convert_expression(node)
 
     expected = js_ast.JSDict(
         keys=[js_ast.JSConstant('a'), js_ast.JSConstant('b')],
@@ -219,26 +219,26 @@ def test_transpile_expression__dict():
 
 def test_transpile_expression__compare():
     node = ast.Compare(left=ast.Name(id='a'), ops=[ast.Eq()], comparators=[ast.Constant(value=1)])
-    js_node = transpile_expression(node)
+    js_node = convert_expression(node)
     assert js_node == js_ast.JSCompare(left=js_ast.JSName('a'), op=js_ast.JSEq(), right=js_ast.JSConstant(1))
 
 
 def test_transpile_expression__subscript():
     node = ast.Subscript(value=ast.Name(id='a', ctx=ast.Load()), slice=ast.Constant(value='c'), ctx=ast.Store())
-    js_node = transpile_expression(node)
+    js_node = convert_expression(node)
     assert js_node == js_ast.JSSubscript(js_ast.JSName('a'), js_ast.JSConstant('c'))
 
 
 def test_transpile_expression_attribute():
     node = ast.Attribute(value=ast.Name(id='foo'), attr='bar')
-    js_node = transpile_expression(node)
+    js_node = convert_expression(node)
     assert js_node == js_ast.JSAttribute(js_ast.JSName('foo'), 'bar')
 
 
 def test_transpile_arg():
     node = ast.arg(arg='a')
 
-    js_node = transpile_arg(node)
+    js_node = convert_arg(node)
 
     expected = js_ast.JSArg(arg='a')
     assert js_node == expected
@@ -247,9 +247,9 @@ def test_transpile_arg():
 def test_transpile_arguments():
     node = _create_arguments_node(['a', 'b'])
 
-    js_node = transpile_arguments(node)
+    js_node = convert_arguments(node)
 
-    expected = js_ast.JSArguments(args=transpile_arg_list(node.args))
+    expected = js_ast.JSArguments(args=convert_arg_list(node.args))
     assert js_node == expected
 
 
@@ -257,15 +257,15 @@ def test_transpile_arguments__kwargs_and_defaults():
     node = _create_arguments_node(['a', 'b'], [ast.Constant(value=1)], 'arg',
                                   ['c', 'd'], [None, ast.Constant(value=1)], 'kwargs')
 
-    js_node = transpile_arguments(node)
+    js_node = convert_arguments(node)
 
     expected = js_ast.JSArguments(
-        args=transpile_arg_list(node.args),
-        defaults=transpile_expression_list(node.defaults),
-        vararg=transpile_arg(node.vararg),
-        kwonlyargs=transpile_arg_list(node.kwonlyargs),
-        kw_defaults=transpile_expression_list(node.kw_defaults),
-        kwarg=transpile_arg(node.kwarg),
+        args=convert_arg_list(node.args),
+        defaults=convert_expression_list(node.defaults),
+        vararg=convert_arg(node.vararg),
+        kwonlyargs=convert_arg_list(node.kwonlyargs),
+        kw_defaults=convert_expression_list(node.kw_defaults),
+        kwarg=convert_arg(node.kwarg),
     )
     assert js_node == expected
 
@@ -307,12 +307,12 @@ def test_transpile_function_def():
     assign_statement = _create_assign_statement('b', ast.Constant(value='sample'))
     node = ast.FunctionDef(name='foo', args=arguments_node, body=[assign_statement])
 
-    js_node = transpile_function_def(node)
+    js_node = convert_function_def(node)
 
     expected = js_ast.JSFunctionDef(
         name='foo',
-        args=transpile_arguments(arguments_node),
-        body=[transpile_statement(assign_statement)]
+        args=convert_arguments(arguments_node),
+        body=[convert_statement(assign_statement)]
     )
     assert js_node == expected
 
@@ -320,7 +320,7 @@ def test_transpile_function_def():
 def test_transpile_return():
     node = ast.Return(value=ast.Constant(value=1))
 
-    js_node = transpile_return(node)
+    js_node = convert_return(node)
 
     expected = js_ast.JSReturn(value=js_ast.JSConstant(value=1))
     assert js_node == expected
@@ -328,14 +328,14 @@ def test_transpile_return():
 
 def test_transpile_statement__delete():
     node = ast.Delete(targets=[ast.Name(id='d')])
-    js_node = transpile_statement(node)
+    js_node = convert_statement(node)
     assert js_node == js_ast.JSStatements([js_ast.JSDelete(target=js_ast.JSName(id='d'))])
 
 
 def test_transpile_statement__delete_multiple():
     node = ast.Delete(targets=[ast.Name(id='d'), ast.Name(id='e')])
 
-    js_node = transpile_statement(node)
+    js_node = convert_statement(node)
 
     expected = js_ast.JSStatements([
         js_ast.JSDelete(target=js_ast.JSName(id='d')),
@@ -347,21 +347,21 @@ def test_transpile_statement__delete_multiple():
 def test_transpile_body__with_pass():
     body = [ast.Pass()]
 
-    js_body = transpile_body(body)
+    js_body = convert_body(body)
 
     assert js_body == []
 
 
 def test_transpile_body__statements():
     body = [ast.Delete(targets=[ast.Name(id='d'), ast.Name(id='e')])]
-    js_body = transpile_body(body)
+    js_body = convert_body(body)
     assert js_body == [js_ast.JSDelete(js_ast.JSName('d')), js_ast.JSDelete(js_ast.JSName('e'))]
 
 
 def test_transpile_statement__while():
     node = ast.While(test=ast.Constant(value=True), body=[ast.Pass()])
 
-    js_node = transpile_statement(node)
+    js_node = convert_statement(node)
 
     expected = js_ast.JSWhile(test=js_ast.JSConstant(value=True), body=[])
     assert js_node == expected
@@ -374,7 +374,7 @@ def test_transpile_statement__while_else():
         orelse=[ast.Expr(ast.Name(id='a', ctx=ast.Load()))],
     )
 
-    js_node = transpile_statement(node)
+    js_node = convert_statement(node)
 
     expected = js_ast.JSWhile(
         test=js_ast.JSConstant(value=True),
@@ -387,7 +387,7 @@ def test_transpile_statement__while_else():
 def test_transpile_statement__if():
     node = ast.If(test=ast.Constant(value=True), body=[ast.Pass()], orelse=[ast.Pass()])
 
-    js_node = transpile_statement(node)
+    js_node = convert_statement(node)
 
     expected = js_ast.JSIf(test=js_ast.JSConstant(value=True), body=[], orelse=[])
     assert js_node == expected
@@ -396,7 +396,7 @@ def test_transpile_statement__if():
 def test_transpile_statement__raise():
     node = ast.Raise(exc=ast.Name(id='Exception', ctx=ast.Load()))
 
-    js_node = transpile_statement(node)
+    js_node = convert_statement(node)
 
     expected = js_ast.JSThrow(exc=js_ast.JSName('Exception'))
     assert js_node == expected
@@ -419,7 +419,7 @@ def test_transpile_statement__try():
         finalbody=[ast.Expr(value=ast.Name(id='e', ctx=ast.Load()))]
     )
 
-    js_node = transpile_statement(node)
+    js_node = convert_statement(node)
 
     expected = js_ast.JSTry(
         body=[js_ast.JSCodeExpression(js_ast.JSName('a'))],
@@ -439,53 +439,53 @@ def test_transpile_statement__try():
 
 def test_transpile_statement__continue():
     node = ast.Continue()
-    js_node = transpile_statement(node)
+    js_node = convert_statement(node)
     assert js_node == js_ast.JSContinue()
 
 
 def test_transpile_statement__break():
     node = ast.Break()
-    js_node = transpile_statement(node)
+    js_node = convert_statement(node)
     assert js_node == js_ast.JSBreak()
 
 
 def test_transpile_statement__import_from():
     node = ast.ImportFrom(module='test', names=[ast.alias(name='a', asname='var_a'), ast.alias(name='foo')])
-    js_node = transpile_statement(node)
+    js_node = convert_statement(node)
     assert js_node == js_ast.JSImport('test', names=[js_ast.JSAlias('a', 'var_a'), js_ast.JSAlias('foo')])
 
 
 def test_transpile_statement__import():
     node = ast.Import(names=[ast.alias(name='test')])
-    js_node = transpile_statement(node)
+    js_node = convert_statement(node)
     assert js_node == js_ast.JSImport('test', names=[])
 
 
 def test_transpile_statement__import_as():
     node = ast.Import(names=[ast.alias(name='test2', asname='bar')])
-    js_node = transpile_statement(node)
+    js_node = convert_statement(node)
     assert js_node == js_ast.JSImport('test2', names=[], alias='bar')
 
 
 def test_transpile_statement__class_def():
     node = ast.ClassDef(name='A', body=[])
-    js_node = transpile_statement(node)
+    js_node = convert_statement(node)
     assert js_node == js_ast.JSClassDef(name='A', body=[])
 
 
 def test_transpile_constant__true():
     node = ast.Constant(value=True)
-    js_node = transpile_constant(node)
+    js_node = convert_constant(node)
     assert js_node == js_ast.JSConstant(value=True)
 
 
 def test_transpile_eq():
     node = ast.Eq()
-    js_node = transpile_eq(node)
+    js_node = convert_eq(node)
     assert js_node == js_ast.JSEq()
 
 
 def test_transpile_module():
     node = ast.Module(body=[ast.Expr(ast.Name(id='a', ctx=ast.Load()))])
-    js_node = transpile_module(node)
+    js_node = convert_ast(node)
     assert js_node == js_ast.JSModule(body=[js_ast.JSCodeExpression(js_ast.JSName('a'))])

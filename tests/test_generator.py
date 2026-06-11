@@ -9,7 +9,7 @@ from typhon.generator import generate_js_name, generate_js_constant, generate_js
     generate_js_call, generate_js_code_expression, generate_js_statement, generate_js_arg, generate_js_arguments, \
     generate_js_return, generate_js_eq, generate_code_block, generate_js_dict, generate_expression_list, \
     generate_js_assign, generate_js_module, generate_js_body
-from typhon.transpiler import transpile_arguments
+from typhon.transpiler import convert_arguments
 
 
 def test_generate_js_code__expression():
@@ -318,7 +318,7 @@ def test_generate_arguments():
 def test_generate_arguments__universal():
     py_node = _create_arguments_node(['a', 'b'], [ast.Constant(value=1)], 'arg',
                                      ['c', 'd'], [None, ast.Constant(value=1)], 'kwargs')
-    js_node = transpile_arguments(py_node)
+    js_node = convert_arguments(py_node)
 
     result = generate_js_arguments(js_node)
 

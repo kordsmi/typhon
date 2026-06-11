@@ -3,8 +3,8 @@ import json
 import os.path
 from functools import cached_property
 
-from typhon.module_info import ModuleInfo, serialize_module_info, deserialize_module_info
-from typhon.object_info import ObjectInfo
+from typhon.module_info import ModuleInfo, serialize_module_info
+from typhon.object_collector import ObjectInfo
 from typhon.source_manager import SourceManager
 from typhon.types import ModulePath
 
@@ -64,13 +64,6 @@ class Module:
         module_info_data = serialize_module_info(module_info)
         with open(json_info_file, 'w') as f:
             json.dump(module_info_data, f, indent=4)
-
-    def load_info(self, root_object: ObjectInfo):
-        json_info_file = os.path.join(self.cache_directory, f'{self.module_name}.json')
-        with open(json_info_file, 'r') as f:
-            info_data = json.load(f)
-
-        return deserialize_module_info(info_data, root_object)
 
 
 def get_module_from_file(source_file_path: str) -> Module:

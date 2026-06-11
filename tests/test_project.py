@@ -1,7 +1,11 @@
+import ast
 import os.path
 from tempfile import TemporaryDirectory
+from unittest import mock
 
 from tests.helpers import source_file
+from typhon.import_graph import ImportGraph
+from typhon.object_collector import ObjectModule, ObjectCollector, ObjectConstant, ObjectClass
 from typhon.types import ModulePath
 from typhon.project import Project
 
@@ -34,26 +38,6 @@ class TestProject:
 
         assert js_code == js_str
 
-    def test_import_graph_from_source(self, temp_dir):
-        source_1 = 'import a\nprint("test")'
-        source_2 = 'print("Hello!")'
-
-        project = Project(temp_dir)
-        with source_file('a.py', source_2, temp_dir):
-            project.transpile_source(source_1)
-
-        assert project.import_graph == {('__main__',): [ModulePath('a')], ('a',): []}
-
-    def test_import_graph_from_file(self, temp_dir):
-        source_1 = 'import a\nprint("test")'
-        source_2 = 'print("Hello!")'
-        project = Project(temp_dir)
-
-        with source_file('source.py', source_1, temp_dir), source_file('a.py', source_2, temp_dir):
-            project.transpile_file('source.py')
-
-        assert project.import_graph == {('__main__',): [ModulePath('a')], ('a',): []}
-
     def test_get_sorted_modules_from_graph(self, temp_dir):
         graph = {
             ('__main__',): [
@@ -68,11 +52,12 @@ class TestProject:
             ('e',): [ModulePath('a')],
         }
         project = Project(temp_dir)
-        project.import_graph = graph
 
-        modules = project.get_sorted_modules_from_graph()
+        with mock.patch.object(ImportGraph, 'get_graph') as get_graph_mock:
+            get_graph_mock.return_value = graph
+            project.get_sorted_modules_from_source('', '__main__')
 
-        assert modules == [
+        assert project.modules == [
             ModulePath('a'),
             ModulePath('d'),
             ModulePath('c'),
@@ -105,7 +90,10 @@ class TestProject:
             source_file_1 = 'main.py'
             source_file_2 = 'test.py'
             test_js_path = os.path.join(temp_dir_path, 'test.js')
-            with source_file(source_file_1, source_1, temp_dir_path), source_file(source_file_2, source_2, temp_dir_path):
+            with (
+                source_file(source_file_1, source_1, temp_dir_path),
+                source_file(source_file_2, source_2, temp_dir_path)
+            ):
                 main_js_path = project.transpile_file(source_file_1)
             with open(main_js_path, 'r') as f:
                 main_js_code = f.read()
@@ -126,5 +114,51 @@ class TestProject:
             project.transpile_source(source_1)
 
         assert list(sorted(project.module_info_list.keys())) == ['__main__', 'foo', 'test']
-        assert list(project.module_info_list['foo'].objects.object_dict.keys()) == ['__special__']
-        assert list(project.module_info_list['test'].objects.object_dict.keys()) == ['__special__', 'foo']
+        assert list(project.module_info_list['foo'].objects.objects.keys()) == ['__special__']
+        assert set(project.module_info_list['test'].objects.objects.keys()) == {'__special__', 'foo'}
+
+    @staticmethod
+    def _collect_objects(source: str, module_name: str) -> ObjectModule:
+        py_tree = ast.parse(source)
+        module_object = ObjectModule(ModulePath(module_name))
+
+        collector = ObjectCollector(module_object)
+        collector.visit(py_tree)
+
+        return module_object
+
+    def test_import_object_to_globals(self, temp_dir):
+        # Константы импортируются как константы
+        source_1 = 'from test import a'
+        source_2 = 'a = 123'
+
+        module_object1 = self._collect_objects(source_1, '__main__')
+        module_object2 = self._collect_objects(source_2, 'test')
+
+        project = Project()
+        project.root_object.objects['__main__'] = module_object1
+        project.root_object.objects['test'] = module_object2
+        project.replace_references_to_objects(module_object1)
+
+        assert list(module_object1.objects.keys()) == ['a']
+        object_info = module_object1.objects['a']
+        assert isinstance(object_info, ObjectConstant)
+        assert object_info.object_value == 123
+
+    def test_import_class_to_globals(self, temp_dir):
+        # Всё что не относится к константам, импортируются как ссылки
+        source_1 = 'from test import A'
+        source_2 = 'class A: pass'
+
+        module_object1 = self._collect_objects(source_1, '__main__')
+        module_object2 = self._collect_objects(source_2, 'test')
+
+        project = Project()
+        project.root_object.objects['__main__'] = module_object1
+        project.root_object.objects['test'] = module_object2
+        project.replace_references_to_objects(module_object1)
+
+        assert list(module_object1.objects.keys()) == ['A']
+        object_info = module_object1.objects['A']
+        assert isinstance(object_info, ObjectClass)
+        assert object_info.object_value == 'A'

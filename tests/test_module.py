@@ -6,13 +6,12 @@ from tempfile import TemporaryDirectory
 import pytest
 
 from tests.helpers import make_package, source_file
-from typhon.object_info import ObjectInfo
 from typhon.js_node_serializer import serialize_js_node
 from typhon.module_info import ModuleInfo
 from typhon.module import Module
+from typhon.object_collector import ObjectInfo, ObjectModule
 from typhon.source_manager import SourceManager
 from typhon.types import ModulePath
-from typhon.object_info_serializer import serialize_object_info
 from typhon.module_transpiler import ModuleTranspiler
 
 
@@ -26,7 +25,8 @@ class TestModule:
     def test_cache_directory(self, temp_dir):
         source = 'print(a)'
         module = Module(source_manager=SourceManager(temp_dir))
-        root_object = ObjectInfo([])
+        root_object = ObjectModule(ModulePath('__main__'))
+        root_object.objects['test'] = ObjectModule(ModulePath('test'))
         transpiler = ModuleTranspiler(source, root_object, ModulePath('test'))
         transpiler.transpile()
         module_info = ModuleInfo(objects=root_object, js_tree=transpiler.js_tree)
@@ -42,7 +42,8 @@ class TestModule:
         source = 'a = 123'
         module = Module(ModulePath('', 'a'), SourceManager(temp_dir))
 
-        root_object = ObjectInfo(None)
+        root_object = ObjectModule(ModulePath('__main__'))
+        root_object.objects['test'] = ObjectModule(ModulePath('test'))
         transpiler = ModuleTranspiler(source, root_object, ModulePath('test'))
         transpiler.transpile()
         module_info = ModuleInfo(objects=root_object, js_tree=transpiler.js_tree)
@@ -56,29 +57,12 @@ class TestModule:
         info_data = json.loads(info_json_data)
         expected = {
             'updated': info_data['updated'],
-            'objects': serialize_object_info(module_info.objects),
             'nodes': serialize_js_node(module_info.js_tree),
         }
         now = datetime.datetime.now()
         updated = datetime.datetime.fromisoformat(info_data['updated'])
         assert (now - updated).seconds == 0
         assert info_data == expected
-
-    def test_load_info(self, temp_dir):
-        source = 'a = 123'
-        module = Module(ModulePath('', 'a'), SourceManager(temp_dir))
-
-        root_object = ObjectInfo(None)
-        transpiler = ModuleTranspiler(source, root_object, ModulePath('test'))
-        transpiler.transpile()
-        module_info = ModuleInfo(objects=root_object, js_tree=transpiler.js_tree)
-        module.save_info(module_info)
-
-        loaded_module = Module(ModulePath('', 'a'), SourceManager(temp_dir))
-        loaded_module_info = loaded_module.load_info(root_object)
-
-        assert loaded_module_info.objects == module_info.objects
-        assert loaded_module_info.js_tree == module_info.js_tree
 
     def test_module_path(self, temp_dir):
         module = Module(ModulePath('', 'a'), SourceManager(temp_dir))

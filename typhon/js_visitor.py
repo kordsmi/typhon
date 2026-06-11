@@ -1,165 +1,118 @@
-import typing
-from typing import Optional, List, Union
+from typing import Optional, List, Callable, Iterable, Tuple
 
 from typhon import js_ast
 
 
-def _one_of(*args):
-    for item in args:
-        if item is not None:
-            return True
-    return False
-
-
-def _or(item1, item2) -> typing.Any:
-    if item1 is not None:
-        return item1
-    return item2
+def iter_fields(node: js_ast.JSNode) -> Iterable[Tuple[str, js_ast.JSNode]]:
+    """
+    Возвращает итератор по парам (имя_поля, значение) для каждого поля узла,
+    определённого в `node._fields`. Если поле отсутствует, оно пропускается.
+    """
+    for field in node._fields:
+        try:
+            yield field, getattr(node, field)
+        except AttributeError:
+            pass
 
 
 class JSNodeVisitor:
-    """Базовый класс для посещения узлов AST JavaScript"""
-    def visit(self, node: js_ast.JSNode | List[js_ast.JSStatement]) \
-            -> Optional[Union[js_ast.JSNode, List[js_ast.JSNode]]]:
-        if isinstance(node, list):
-            return self.visit_list(node)
+    """
+    Базовый класс для обхода узлов дерева синтаксического разбора (AST).
+    Этот класс последовательно посещает все узлы AST и вызывает соответствующую
+    функцию-обработчик для каждого из них. Метод-обработчик может вернуть значение,
+    которое будет возвращено методом `visit`.
 
-        method_name = f'visit_{type(node).__name__}'
-        method = getattr(self, method_name)
-        return method(node)
+    Этот класс предназначен для наследования — производные классы должны добавлять
+    свои собственные методы-посетители.
 
-    def visit_list(self, node_list: list[js_ast.JSStatement]) -> Optional[List[js_ast.JSStatement]]:
-        new_list = []
-        modified = False
-        for item in node_list:
-            new_item = self.visit(item)
-            if new_item:
-                modified = True
-                if isinstance(new_item, js_ast.JSNop):
-                    continue
-                new_list.append(new_item)
-            else:
-                new_list.append(item)
+    По умолчанию имя метода-обработчика формируется как ``'visit_'`` + имя класса узла.
+    Например, для узла `JSTry` будет вызван метод `visit_JSTry`.
+    Это поведение можно изменить, переопределив метод `visit`.
+    Если для узла не найден подходящий метод-обработчик (возвращается `None`),
+    вместо него вызывается метод `generic_visit`.
 
-        if modified:
-            return new_list
+    Не используйте `JSNodeVisitor`, если вы хотите вносить изменения в узлы во время обхода.
+    Для модификации дерева существует специальный класс `JSNodeTransformer`.
+    """
 
-        return None
+    def visit(self, node: js_ast.JSNode) -> Optional[js_ast.JSNode | List[js_ast.JSNode]]:
+        """Посещение узла."""
+        method = 'visit_' + node.__class__.__name__
+        visitor: Callable[[js_ast.JSNode], None] = getattr(self, method, self.generic_visit)
+        return visitor(node)
 
-    def visit_JSLet(self, node: js_ast.JSLet) -> Optional[js_ast.JSLet]:
-        new_assign: js_ast.JSAssign | None = self.visit(node.assign)
-        if new_assign:
-            return js_ast.JSLet(new_assign)
-        return None
+    def generic_visit(self, node: js_ast.JSNode):
+        """Вызывается по умолчанию, если для узла не определён специализированный метод-посетитель.
 
-    def visit_JSAssign(self, node: js_ast.JSAssign) -> Optional[js_ast.JSAssign]:
-        new_target = self.visit(node.target)
-        new_value = self.visit(node.value)
-        if new_target or new_value:
-            return js_ast.JSAssign(new_target or node.target, new_value or node.value)
-        return None
+        Метод рекурсивно посещает все поля узла, которые являются узлами AST или списками узлов,
+        и применяет к ним обход с помощью `visit`. Это позволяет автоматически проходить
+        по всей структуре дерева без необходимости явно прописывать обработку каждого типа узлов.
 
-    def visit_JSName(self, node: js_ast.JSName) -> Optional[js_ast.JSName]:
-        pass
+        Например, если узел содержит список дочерних узлов (например, тело функции),
+        `generic_visit` рекурсивно посетит каждый из них.
 
-    def visit_JSConstant(self, node: js_ast.JSConstant) -> Optional[js_ast.JSConstant]:
-        pass
+        Переопределите этот метод, если нужно изменить поведение обхода по умолчанию.
+        """
+        for field, value in iter_fields(node):
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, js_ast.JSNode):
+                        self.visit(item)
+            elif isinstance(value, js_ast.JSNode):
+                self.visit(value)
 
-    def visit_JSFunctionDef(self, node: js_ast.JSFunctionDef) -> Optional[js_ast.JSFunctionDef]:
-        new_args = self.visit(node.args)
-        new_body = self.visit(node.body)
-        if new_args or new_body:
-            return js_ast.JSFunctionDef(node.name, new_args or node.args, new_body or node.body)
-        return None
 
-    def visit_JSArguments(self, node: js_ast.JSArguments) -> Optional['js_ast.JSArguments']:
-        args = node.args
-        new_args = self.visit(args) if args else None
-        defaults = node.defaults
-        new_defaults = self.visit(defaults) if defaults else None
-        vararg = node.vararg
-        new_vararg = self.visit(vararg) if vararg else None
-        kwonlyargs = node.kwonlyargs
-        new_kwonlyargs = self.visit(kwonlyargs) if kwonlyargs else None
-        kw_defaults = node.kw_defaults
-        new_kw_defaults = self.visit(kw_defaults) if kw_defaults else None
-        kwarg = node.kwarg
-        new_kwarg = self.visit(kwarg) if kwarg else None
+class JSNodeTransformer(JSNodeVisitor):
+    """
+    Подкласс класса :class:`JSNodeVisitor`, который обходит дерево абстрактного синтаксического дерева (AST)
+    и позволяет модифицировать его узлы.
 
-        if _one_of(new_args, new_defaults, new_vararg, new_kwonlyargs, new_kw_defaults, new_kwarg):
-            return js_ast.JSArguments(_or(new_args, args), _or(new_defaults, defaults), _or(new_vararg, vararg),
-                                      _or(new_kwonlyargs, kwonlyargs), _or(new_kw_defaults, kw_defaults),
-                                      _or(new_kwarg, kwarg))
-        return None
+    Класс `JSNodeTransformer` проходит по AST и использует возвращаемое значение методов-посетителей,
+    чтобы заменить или удалить старый узел. Если метод-посетитель возвращает ``None``,
+    узел будет удалён из дерева; в противном случае он заменяется на возвращённое значение.
+    Возвращаемым значением может быть тот же самый узел — тогда замена не происходит.
 
-    def visit_JSImport(self, node: js_ast.JSImport) -> Optional[js_ast.JSImport]:
-        names = []
-        for name in node.names:
-            new_name = self.visit_JSAlias(name)
-            if new_name:
-                names.append(new_name)
-            else:
-                names.append(name)
+    Пример трансформера, который заменяет все обращения к переменным
+     (``x``) на доступ через объект ``data['x']``::
 
-        if names:
-            return js_ast.JSImport(node.module, names, node.alias)
+       class RewriteName(JSNodeTransformer):
 
-        return None
+           def visit_Name(self, node):
+               return Subscript(
+                   value=Name(id='data', ctx=Load()),
+                   slice=Constant(value=node.id),
+                   ctx=node.ctx
+               )
 
-    def visit_JSAlias(self, node: js_ast.JSAlias) -> Optional[js_ast.JSAlias]:
-        pass
+    Имейте в виду, что если узел содержит дочерние узлы, вы должны либо обработать их самостоятельно,
+    либо сначала вызвать метод :meth:`generic_visit`.
 
-    def visit_JSClassDef(self, node: js_ast.JSClassDef) -> Optional[js_ast.JSClassDef]:
-        new_body = self.visit_list(node.body)
-        if new_body:
-            return js_ast.JSClassDef(node.name, new_body)
-        return None
+    Для узлов, входящих в состав списка инструкций (все узлы-выражения и операторы),
+    метод-посетитель может также вернуть список узлов вместо одного узла.
 
-    def visit_JSArg(self, node: js_ast.JSArg) -> Optional[js_ast.JSArg]:
-        pass
+    Обычно трансформер используется следующим образом::
 
-    def visit_JSNop(self, node: js_ast.JSNop) -> Optional[js_ast.JSNop]:
-        pass
+       node = YourTransformer().visit(node)
+    """
 
-    def visit_JSCodeExpression(self, node: js_ast.JSCodeExpression) -> Optional[js_ast.JSCodeExpression]:
-        new_value = self.visit(node.value)
-        if not new_value:
-            return None
-
-        assert isinstance(new_value, (js_ast.JSExpression, js_ast.JSStatement))
-        return js_ast.JSCodeExpression(new_value)
-
-    def visit_JSStatement(self, node: js_ast.JSStatement) -> Optional[js_ast.JSStatement]:
-        return None
-
-    def visit_JSExpression(self, node: js_ast.JSExpression) -> Optional[js_ast.JSExpression]:
-        return None
-
-    def visit_JSCall(self, node: js_ast.JSCall) -> Optional[js_ast.JSCall]:
-        new_func = self.visit(node.func)
-        new_args = self.visit(node.args) if node.args else None
-        new_keywords = self.visit(node.keywords) if node.keywords else None
-        if new_func or new_args or new_keywords:
-            return js_ast.JSCall(new_func or node.func, new_args or node.args, new_keywords or node.keywords)
-        return None
-
-    def visit_JSBinOp(self, node: js_ast.JSBinOp) -> Optional[js_ast.JSBinOp]:
-        pass
-
-    def visit_JSAttribute(self, node: js_ast.JSAttribute) -> Optional[js_ast.JSAttribute]:
-        new_value = self.visit(node.value)
-        if new_value:
-            return js_ast.JSAttribute(new_value or node.value, node.attr)
-        return None
-
-    def visit_JSKeyWord(self, node: js_ast.JSKeyWord) -> Optional[js_ast.JSKeyWord]:
-        new_value = self.visit(node.value)
-        if new_value:
-            return js_ast.JSKeyWord(arg=node.arg, value=_or(new_value, node.value))
-        return None
-
-    def visit_JSReturn(self, node: js_ast.JSReturn) -> Optional[js_ast.JSReturn]:
-        new_value = self.visit_JSExpression(node.value)
-        if new_value:
-            return js_ast.JSReturn(new_value)
-        return None
+    def generic_visit(self, node: js_ast.JSNode) -> Optional[js_ast.JSNode]:
+        for field, old_value in iter_fields(node):
+            if isinstance(old_value, list):
+                new_values: List = []
+                for value in old_value:
+                    if isinstance(value, js_ast.JSNode):
+                        value = self.visit(value)
+                        if value is None:
+                            continue
+                        elif not isinstance(value, js_ast.JSNode):
+                            new_values.extend(value)
+                            continue
+                    new_values.append(value)
+                old_value[:] = new_values
+            elif isinstance(old_value, js_ast.JSNode):
+                new_node = self.visit(old_value)
+                if new_node is None:
+                    delattr(node, field)
+                else:
+                    setattr(node, field, new_node)
+        return node

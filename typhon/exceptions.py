@@ -21,6 +21,10 @@ class InvalidNode(Exception):
         return f'Invalid node: {type(self.node).__name__}{position_str}\n{ast.dump(self.node, indent=2)}'
 
 
+class InvalidReferenceTarget(Exception):
+    pass
+
+
 class UnsupportedNode(Exception):
     pass
 

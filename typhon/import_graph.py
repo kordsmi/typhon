@@ -1,5 +1,5 @@
 import ast
-from _ast import Import, AST
+from _ast import Import, AST, ImportFrom
 from typing import Any
 
 from typhon.exceptions import TyphonImportError
@@ -22,6 +22,14 @@ class ImportCollector(ast.NodeVisitor):
                 module_path.append(module_part)
                 self.imports.append(ModulePath(*module_path))
 
+    def visit_ImportFrom(self, node: ImportFrom) -> Any:
+        module_parts = node.module.split('.')
+        module_path = []
+        for module_part in module_parts:
+            module_path.append(module_part)
+            self.imports.append(ModulePath(*module_path))
+
+
     def generic_visit(self, node: AST) -> Any:
         for field, value in ast.iter_fields(node):
             if field == 'body' and not isinstance(node, ast.Module):
@@ -41,16 +49,17 @@ class ImportGraph:
         - Построение графа зависимостей
         - Обнаружение циклических импортов
     """
-    def __init__(self, source: str, source_manager: SourceManager):
+    def __init__(self, source: str, source_manager: SourceManager, main_module_name: str):
         self.source = source
         self.graph = {}
         self.queue = []
         self.source_manager = source_manager
+        self.main_module_name = main_module_name
 
     def get_graph(self) -> dict:
         self.graph = {}
         self.queue = []
-        self.get_imports_and_add_to_queue(ModulePath('__main__'), self.source)
+        self.get_imports_and_add_to_queue(ModulePath(self.main_module_name), self.source)
 
         while self.queue:
             module_path = self.queue.pop(0)
@@ -105,4 +114,4 @@ class ImportGraph:
                 check_loop(imported_module_path)
             graph_stack.pop()
 
-        check_loop(ModulePath('__main__'))
+        check_loop(ModulePath(self.main_module_name))
